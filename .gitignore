@@ -1,3 +1,4 @@
+.DS_Store
 __pycache__
 example/mmsys18/tmp
 example/mmsys18/stats
