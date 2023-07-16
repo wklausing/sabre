@@ -397,12 +397,6 @@ class NetworkModel:
                                 time = total_download_time, time_to_first_bit = latency,
                                 abandon_to_quality = abandon_quality)
 
-class ThroughputHistory:
-    def __init__(self, config):
-        pass
-    def push(self, time, tput, lat):
-        raise NotImplementedError
-
 class SessionInfo:
 
     def __init__(self):
@@ -415,6 +409,12 @@ class SessionInfo:
     def get_buffer_contents(self):
         global buffer_contents
         return buffer_contents[:]
+
+class ThroughputHistory:
+    def __init__(self, config):
+        pass
+    def push(self, time, tput, lat):
+        raise NotImplementedError
 
 class SlidingWindow(ThroughputHistory):
 
@@ -507,11 +507,6 @@ class Ewma(ThroughputHistory):
             lat = l if lat == None else max(lat, l) # conservative case is max
         throughput = tput
         latency = lat
-
-average_list = {}
-average_list['sliding'] = SlidingWindow
-average_list['ewma'] = Ewma
-average_default = 'ewma'
 
 class Abr:
 
@@ -919,15 +914,6 @@ class AbrInput(Abr):
     def check_abandon(self, progress, buffer_level):
         return self.abr.check_abandon(progress, buffer_level)
 
-abr_list = {}
-abr_list['bola'] = Bola
-abr_list['bolae'] = BolaEnh
-# abr_list['bba'] = Bba
-# abr_list['throughput'] = ThroughputRule
-# abr_list['dynamic'] = Dynamic
-# abr_list['dynamicdash'] = DynamicDash
-abr_default = 'bolae'
-
 class Replacement:
     def check_replace(self, quality):
         return None
@@ -1011,28 +997,44 @@ class ReplacementInput(Replacement):
         return self.replacement.check_abandon(progress, buffer_level)
 
 class Args:
-  def __init__(self):
-    self.network = 'example/network.json'
-    self.network_multiplier = 1
-    self.movie = 'example/movie.json'
-    self.movie_length = None
-    self.abr = abr_default
-    self.abr_basic = False
-    self.abr_osc = False
-    self.gamma_p = 5
-    self.no_insufficient_buffer_rule = False
-    self.moving_average = average_default
-    self.window_size = [3]
-    self.half_life = [3, 8]
-    self.seek = None
-    self.replace = 'none'
-    self.max_buffer = 25
-    self.no_abandon = False
-    self.rampup_threshold = None
-    self.verbose = False
+    def __init__(self, abr_default = 'bolae', network='example/network.json', network_multiplier=1, movie='example/movie.json', movie_length=None, 
+                 abr_basic=False, abr_osc=False, gamma_p=5, no_insufficient_buffer_rule=False, window_size=[3], 
+                 half_life=[3, 8], seek=None, replace='none', max_buffer=25, no_abandon=False, rampup_threshold=None, verbose=False):
+        self.abr_list = {}
+        self.abr_list['bola'] = Bola
+        self.abr_list['bolae'] = BolaEnh
+        # self.abr_list['bba'] = Bba
+        # self.abr_list['throughput'] = ThroughputRule
+        # self.abr_list['dynamic'] = Dynamic
+        # self.abr_list['dynamicdash'] = DynamicDash
+        self.abr_default = abr_default
 
-def initSabre():
-    global args, verbose, buffer_contents, buffer_fcc, pending_quality_up, reaction_metrics, rebuffer_event_count
+        self.average_list = {}
+        self.average_list['sliding'] = SlidingWindow
+        self.average_list['ewma'] = Ewma
+        self.average_default = 'ewma'
+
+        self.network = network
+        self.network_multiplier = network_multiplier
+        self.movie = movie
+        self.movie_length = movie_length
+        self.abr = self.abr_default
+        self.abr_basic = abr_basic
+        self.abr_osc = abr_osc
+        self.gamma_p = gamma_p
+        self.no_insufficient_buffer_rule = no_insufficient_buffer_rule
+        self.moving_average = self.average_default
+        self.window_size = window_size
+        self.half_life = half_life
+        self.seek = seek
+        self.replace = replace
+        self.max_buffer = max_buffer
+        self.no_abandon = no_abandon
+        self.rampup_threshold = rampup_threshold
+        self.verbose = verbose
+
+def initSabre(args = Args()):
+    global verbose, buffer_contents, buffer_fcc, pending_quality_up, reaction_metrics, rebuffer_event_count
     global rebuffer_time, played_utility, played_bitrate, total_play_time, total_bitrate_change, total_log_bitrate_change
     global total_reaction_time, last_played, overestimate_count, overestimate_average, goodestimate_count
     global goodestimate_average, estimate_average, rampup_origin, rampup_time, rampup_threshold
@@ -1040,8 +1042,6 @@ def initSabre():
     global config, abr, network, replacer, throughput_history, quality, size, download_metric, download_time, startup_time
     global t, l, next_segment, abandoned_to_quality, full_delay, current_segment, check_abandon
     global delay, replace, throughput
-
-    args = Args()
 
     verbose = args.verbose
 
@@ -1110,9 +1110,9 @@ def initSabre():
     if args.abr[-3:] == '.py':
         abr = AbrInput(args.abr, config, session_info)
     else:
-        abr_list[args.abr].use_abr_o = args.abr_osc
-        abr_list[args.abr].use_abr_u = not args.abr_osc
-        abr = abr_list[args.abr](config, utils)
+        args.abr_list[args.abr].use_abr_o = args.abr_osc
+        args.abr_list[args.abr].use_abr_u = not args.abr_osc
+        abr = args.abr_list[args.abr](config, utils)
     network = NetworkModel(network_trace, utils)
 
     if args.replace[-3:] == '.py':
@@ -1125,7 +1125,7 @@ def initSabre():
         replacer = NoReplace()
 
     config = {'window_size': args.window_size, 'half_life': args.half_life}
-    throughput_history = average_list[args.moving_average](config)
+    throughput_history = args.average_list[args.moving_average](config)
 
     quality = abr.get_first_quality()
     size = manifest.segments[0][quality]
@@ -1321,7 +1321,9 @@ def initSabre():
     return result
 
 if __name__ == '__main__':
-    result = initSabre()
+    result = initSabre(Args())
     
     for key, value in result.items():
         print(f'{key}: {value}')
+
+    print('Sabre_encapsulated')
