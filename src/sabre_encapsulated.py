@@ -416,8 +416,6 @@ class SessionInfo:
         global buffer_contents
         return buffer_contents[:]
 
-session_info = SessionInfo()
-
 class SlidingWindow(ThroughputHistory):
 
     default_window_size = [3]
@@ -517,10 +515,8 @@ average_default = 'ewma'
 
 class Abr:
 
-    session = session_info
-
-    def __init__(self, config, util):
-        pass
+    def __init__(self, config, util, session_info):
+        self.session = session_info
     def get_quality_delay(self, segment_index):
         raise NotImplementedError
     def get_first_quality(self):
@@ -903,7 +899,7 @@ class BolaEnh(Abr):
 
 class AbrInput(Abr):
 
-    def __init__(self, path, config):
+    def __init__(self, path, config, session_info):
         self.name = os.path.splitext(os.path.basename(path))[0]
         self.abr_module = SourceFileLoader(self.name, path).load_module()
         self.abr_class = getattr(self.abr_module, self.name)
@@ -933,9 +929,6 @@ abr_list['bolae'] = BolaEnh
 abr_default = 'bolae'
 
 class Replacement:
-
-    session = session_info
-
     def check_replace(self, quality):
         return None
     def check_abandon(self, progress, buffer_level):
@@ -1005,7 +998,7 @@ class Replace(Replacement):
 
 class ReplacementInput(Replacement):
 
-    def __init__(self, path):
+    def __init__(self, path, session_info):
         self.name = os.path.splitext(os.path.basename(path))[0]
         self.replacement_module = SourceFileLoader(self.name, path).load_module()
         self.replacement_class = getattr(self.replacement_module, self.name)
@@ -1082,6 +1075,7 @@ def initSabre():
     ManifestInfo = namedtuple('ManifestInfo', 'segment_time bitrates utilities segments')
     NetworkPeriod = namedtuple('NetworkPeriod', 'time bandwidth latency')
     utils = Util()
+    session_info = SessionInfo()
 
     manifest = utils.load_json(args.movie)
     bitrates = manifest['bitrates_kbps']
@@ -1114,7 +1108,7 @@ def initSabre():
               'abr_basic': args.abr_basic,
               'no_ibr': args.no_insufficient_buffer_rule}
     if args.abr[-3:] == '.py':
-        abr = AbrInput(args.abr, config)
+        abr = AbrInput(args.abr, config, session_info)
     else:
         abr_list[args.abr].use_abr_o = args.abr_osc
         abr_list[args.abr].use_abr_u = not args.abr_osc
@@ -1122,7 +1116,7 @@ def initSabre():
     network = NetworkModel(network_trace, utils)
 
     if args.replace[-3:] == '.py':
-        replacer = ReplacementInput(args.replace)
+        replacer = ReplacementInput(args.replace, session_info)
     if args.replace == 'left':
         replacer = Replace(0)
     elif args.replace == 'right':
