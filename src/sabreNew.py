@@ -48,6 +48,10 @@ from enum import Enum
 #     session info
 
 class Util:
+
+    def __init__(self, buffer_contents):
+        self.buffer_contents = buffer_contents        
+
     def load_json(self, path):
         with open(path) as file:
             obj = json.load(file)
@@ -55,14 +59,12 @@ class Util:
 
     def get_buffer_level(self):
         global manifest
-        global buffer_contents
         global buffer_fcc
 
-        return manifest.segment_time * len(buffer_contents) - buffer_fcc
+        return manifest.segment_time * len(self.buffer_contents) - buffer_fcc
 
     def deplete_buffer(self, time):
         global manifest
-        global buffer_contents
         global buffer_fcc
         global rebuffer_event_count
         global rebuffer_time
@@ -78,7 +80,7 @@ class Util:
         global rampup_threshold
         global sustainable_quality
 
-        if len(buffer_contents) == 0:
+        if len(self.buffer_contents) == 0:
             rebuffer_time += time
             total_play_time += time
             return
@@ -93,14 +95,14 @@ class Util:
 
             time -= manifest.segment_time - buffer_fcc
             total_play_time += manifest.segment_time - buffer_fcc
-            buffer_contents.pop(0)
+            self.buffer_contents.pop(0)
             buffer_fcc = 0
 
         # buffer_fcc == 0 if we're here
 
-        while time > 0 and len(buffer_contents) > 0:
+        while time > 0 and len(self.buffer_contents) > 0:
 
-            quality = buffer_contents[0]
+            quality = self.buffer_contents[0]
             played_utility += manifest.utilities[quality]
             played_bitrate += manifest.bitrates[quality]
             if quality != last_played and last_played != None:
@@ -121,7 +123,7 @@ class Util:
                     p.append(total_play_time)
 
             if time >= manifest.segment_time:
-                buffer_contents.pop(0)
+                self.buffer_contents.pop(0)
                 total_play_time += manifest.segment_time
                 time -= manifest.segment_time
             else:
@@ -137,13 +139,12 @@ class Util:
         self.process_quality_up(total_play_time)
 
     def playout_buffer(self):
-        global buffer_contents
         global buffer_fcc
 
         self.deplete_buffer(self.get_buffer_level())
 
         # make sure no rounding error
-        del buffer_contents[:]
+        del self.buffer_contents[:]
         buffer_fcc = 0
 
     def process_quality_up(self, now):
@@ -187,7 +188,7 @@ class Util:
         # filter out switches which are not upwards (three separate checks)
         if quality <= previous_quality:
             return
-        for q in buffer_contents:
+        for q in self.buffer_contents:
             if quality <= q:
                 return
         for p in pending_quality_up:
@@ -209,8 +210,9 @@ class NetworkModel:
     min_progress_size = 12000
     min_progress_time = 50
 
-    def __init__(self, network_trace, util):
+    def __init__(self, network_trace, util, verbose=False):
         self.util = util
+        self.verbose = verbose
 
         global sustainable_quality
         global network_total_time
@@ -247,7 +249,7 @@ class NetworkModel:
             self.util.advertize_new_network_quality(
                 sustainable_quality, previous_sustainable_quality)
 
-        if verbose:
+        if self.verbose:
             print('[%d] Network: %d,%d  (q=%d: bitrate=%d)' %
                   (round(network_total_time),
                    self.trace[self.index].bandwidth, self.trace[self.index].latency,
@@ -434,7 +436,7 @@ class NetworkModel:
                 abandon_quality = check_abandon(
                     dp, max(0, buffer_level - total_download_time))
                 if abandon_quality != None:
-                    if verbose:
+                    if self.verbose:
                         print('%d abandoning %d->%d' %
                               (idx, quality, abandon_quality))
                         print('%d/%d %d(%d)' %
@@ -467,14 +469,10 @@ class SessionInfo:
         global buffer_contents
         return buffer_contents[:]
     
-session_info = SessionInfo()
-
 class Abr:
 
-    session = session_info
-
-    def __init__(self, config):
-        pass
+    def __init__(self, config, session_info):
+        self.session = session_info
 
     def get_quality_delay(self, segment_index):
         raise NotImplementedError
@@ -509,7 +507,8 @@ class Abr:
 
 class Replacement:
 
-    session = session_info
+    def __init__(self, config, session_info):
+        self.session = session_info
 
     def check_replace(self, quality):
         return None
@@ -753,11 +752,8 @@ class BolaEnh(Abr):
         STARTUP = 1
         STEADY = 2
 
-    def __init__(self, config, util):
+    def __init__(self, config, util, verbose, manifest):
         self.util = util
-
-        global verbose
-        global manifest
 
         config_buffer_size = config['buffer_size']
         self.abr_osc = config['abr_osc']
@@ -1167,7 +1163,7 @@ class NoReplace(Replacement):
 
 class Replace(Replacement):
 
-    def __init__(self, strategy):
+    def __init__(self, strategy, buffer_contents):
         self.strategy = strategy
         self.replacing = None
         # self.replacing is either None or -ve index to buffer_contents
@@ -1225,7 +1221,7 @@ class Replace(Replacement):
 
 class AbrInput(Abr):
 
-    def __init__(self, path, config):
+    def __init__(self, path, config, session_info):
         self.name = os.path.splitext(os.path.basename(path))[0]
         self.abr_module = SourceFileLoader(self.name, path).load_module()
         self.abr_class = getattr(self.abr_module, self.name)
@@ -1252,7 +1248,7 @@ class AbrInput(Abr):
 
 class ReplacementInput(Replacement):
 
-    def __init__(self, path):
+    def __init__(self, path, session_info):
         self.name = os.path.splitext(os.path.basename(path))[0]
         self.replacement_module = SourceFileLoader(
             self.name, path).load_module()
@@ -1286,13 +1282,10 @@ def init(
     verboseInput=False,
     window_size=[3],
 ):
-    util = Util()
-
-    global verbose
+    
     verbose = verboseInput
-
-    global buffer_contents
     buffer_contents = []
+    util = Util(buffer_contents)
     global buffer_fcc
     buffer_fcc = 0
     global pending_quality_up
@@ -1384,17 +1377,18 @@ def init(
     else:
         abr_list[abr].use_abr_o = abr_osc
         abr_list[abr].use_abr_u = not abr_osc
-        abr = abr_list[abr](config, util)
-    network = NetworkModel(network_trace, util)
+        abr = abr_list[abr](config, util, verbose, manifest)
+    network = NetworkModel(network_trace, util, verbose)
 
     if replace[-3:] == '.py':
         replacer = ReplacementInput(replace)
     if replace == 'left':
-        replacer = Replace(0)
+        replacer = Replace(0, buffer_contents)
     elif replace == 'right':
-        replacer = Replace(1)
+        replacer = Replace(1, buffer_contents)
     else:
-        replacer = NoReplace()
+        session_info = SessionInfo()
+        replacer = NoReplace(config, session_info)
 
     config = {'window_size': window_size, 'half_life': half_life}
     throughput_history = average_list[moving_average](config)
