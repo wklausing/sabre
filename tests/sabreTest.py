@@ -2,9 +2,9 @@ import unittest
 import sys
 sys.path.append('/Users/prabu/git/sabre')
 
-#from src.sabreEncapsulated import init as initSabreNew
-from src.sabre import init as initSabre
 from src.sabreOriginal import init as initSabreOriginal
+from src.sabre import init as initSabre
+from src.sabreNew import init as initSabreNew
 
 class TestMainFunction(unittest.TestCase):
 
@@ -38,22 +38,22 @@ class TestMainFunction(unittest.TestCase):
         for key in self.originalResult:
             self.assertEqual(self.originalResult[key], resultSabreOriginal[key])
 
-    # def testCheckValuesWithNew(self):
-    #     '''
-    #     Testing sabreOriginal.py against sabreEncapsulated.py
-    #     '''
-    #     resultSabreOriginal = initSabreNew()
-    #     for key in self.originalResult:
-    #         self.assertEqual(self.originalResult[key], resultSabreOriginal[key])
-
-    def testCheckValuesWithNew2(self):
+    def testCheckValuesWithSabre(self):
         '''
-        Testing sabreOriginal.py against sabre.py. Trying to encapsulate again.
+        Testing original values against sabre.py
         '''
         resultSabreOriginal = initSabre()
         for key in self.originalResult:
             self.assertEqual(self.originalResult[key], resultSabreOriginal[key])
 
+    def testCheckValuesAgainstSabreNew(self):
+        '''
+        Testing sabre.py against sabreNew.py
+        '''
+        resultSabre = initSabre()
+        resultSabreNew = initSabreNew()
+        for key in resultSabre:
+            self.assertEqual(resultSabre[key], resultSabreNew[key])
 
 if __name__ == '__main__':
     unittest.main()
