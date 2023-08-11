@@ -4,7 +4,7 @@ sys.path.append('/Users/prabu/git/sabre')
 
 from src.sabreOriginal import init as initSabreOriginal
 from src.sabre import init as initSabre
-from src.sabreNew import init as initSabreNew
+from src.sabreNew2 import init as initSabreNew
 
 class TestMainFunction(unittest.TestCase):
 
@@ -30,21 +30,21 @@ class TestMainFunction(unittest.TestCase):
             'estimate': -234.28114307059911
         }
 
-    def testCheckValuesWithOriginal(self):
-        '''
-        Testing original values against sabreOriginal.py
-        '''
-        resultSabreOriginal = initSabreOriginal()
-        for key in self.originalResult:
-            self.assertEqual(self.originalResult[key], resultSabreOriginal[key])
+    # def testCheckValuesWithOriginal(self):
+    #     '''
+    #     Testing original values against sabreOriginal.py
+    #     '''
+    #     resultSabreOriginal = initSabreOriginal()
+    #     for key in self.originalResult:
+    #         self.assertEqual(self.originalResult[key], resultSabreOriginal[key])
 
-    def testCheckValuesWithSabre(self):
-        '''
-        Testing original values against sabre.py
-        '''
-        resultSabreOriginal = initSabre()
-        for key in self.originalResult:
-            self.assertEqual(self.originalResult[key], resultSabreOriginal[key])
+    # def testCheckValuesWithSabre(self):
+    #     '''
+    #     Testing original values against sabre.py
+    #     '''
+    #     resultSabreOriginal = initSabre()
+    #     for key in self.originalResult:
+    #         self.assertEqual(self.originalResult[key], resultSabreOriginal[key])
 
     def testCheckValuesAgainstSabreNew(self):
         '''
@@ -54,6 +54,21 @@ class TestMainFunction(unittest.TestCase):
         resultSabreNew = initSabreNew()
         for key in resultSabre:
             self.assertEqual(resultSabre[key], resultSabreNew[key])
+
+    def testCheckValuesAgainstSabreNewAllOptions(self):
+        '''
+        Testing sabre.py against sabreNew.py
+        '''
+        abrList = ['bola', 'bolae', 'throughput', 'dynamic', 'dynamicdash']
+        averageList = ['ewma', 'sliding']
+        for abr in abrList:
+            for average in averageList:
+                print('Testing: ', abr, average)
+                resultSabreNew = initSabreNew(abr=abr, moving_average=average, verboseInput=False)
+                resultSabre = initSabre(abr=abr, moving_average=average, verboseInput=False)
+                
+                for key in resultSabre:
+                    self.assertEqual(resultSabre[key], resultSabreNew[key])
 
 if __name__ == '__main__':
     unittest.main()

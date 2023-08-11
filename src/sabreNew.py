@@ -1,31 +1,5 @@
-# Copyright (c) 2018, Kevin Spiteri
-# All rights reserved.
-#
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions are met:
-#
-# 1. Redistributions of source code must retain the above copyright notice, this
-#    list of conditions and the following disclaimer.
-# 2. Redistributions in binary form must reproduce the above copyright notice,
-#    this list of conditions and the following disclaimer in the documentation
-#    and/or other materials provided with the distribution.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
-# ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-# ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-import argparse
 import json
 import math
-import sys
-import string
 import os
 from importlib.machinery import SourceFileLoader
 from collections import namedtuple
@@ -1403,7 +1377,10 @@ def init(
     t = download_metric.size / download_time
     l = download_metric.time_to_first_bit
     throughput_history.push(download_time, t, l)
-    # print('%d,%d -> %d,%d' % (t, l, throughput, latency))
+
+    if verbose:
+        print('%d,%d -> %d,%d' % (t, l, throughput, latency))
+    
     total_play_time += download_metric.time
 
     if verbose:
@@ -1468,16 +1445,18 @@ def init(
             if verbose:
                 print('abr delay %d bl=%d' % (delay, util.get_buffer_level()))
 
-        # print('size %d, current_segment %d, quality %d, buffer_level %d' %
-        #      (size, current_segment, quality, get_buffer_level()))
+        if verbose:
+            print('size %d, current_segment %d, quality %d, buffer_level %d' %
+                (size, current_segment, quality, util.get_buffer_level()))
 
         download_metric = network.download(size, current_segment, quality,
                                            util.get_buffer_level(), check_abandon)
 
-        # print('index %d, quality %d, downloaded %d/%d, time %d=%d+.' %
-        #      (download_metric.index, download_metric.quality,
-        #       download_metric.downloaded, download_metric.size,
-        #       download_metric.time, download_metric.time_to_first_bit))
+        if verbose:
+            print('index %d, quality %d, downloaded %d/%d, time %d=%d+.' %
+                (download_metric.index, download_metric.quality,
+                download_metric.downloaded, download_metric.size,
+                download_metric.time, download_metric.time_to_first_bit))
 
         if verbose:
             print('[%d-%d]  %d: q=%d s=%d/%d t=%d=%d+%d ' %
