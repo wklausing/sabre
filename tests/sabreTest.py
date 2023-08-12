@@ -48,7 +48,7 @@ class TestMainFunction(unittest.TestCase):
             for average in averageList:
                 print('Testing: ', abr, average)
                 resultSabreV1 = initSabreV1(abr=abr, moving_average=average, verboseInput=False)
-                resultSabreV2 = initSabreV2(abr=abr, moving_average=average, verboseInput=False)
+                resultSabreV2 = initSabreV2(abr=abr, moving_average=average, verbose=False)
                 
                 for key in resultSabreV1:
                     self.assertEqual(resultSabreV1[key], resultSabreV2[key])

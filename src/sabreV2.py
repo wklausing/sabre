@@ -1286,7 +1286,7 @@ def init(
     util.buffer_fcc = 0
     util.pending_quality_up = []
 
-    rebuffer_event_count = 0
+    util.rebuffer_event_count = 0
     util.rebuffer_time = 0
 
     util.played_utility = 0
@@ -1550,9 +1550,9 @@ def init(
         print('rebuffer ratio: %f' % (util.rebuffer_time / util.total_play_time))
         print('time average rebuffer: %f' %
             (util.rebuffer_time / 1000 * to_time_average))
-        print('total rebuffer events: %f' % rebuffer_event_count)
+        print('total rebuffer events: %f' % util.rebuffer_event_count)
         print('time average rebuffer events: %f' %
-            (rebuffer_event_count * to_time_average))
+            (util.rebuffer_event_count * to_time_average))
         print('total bitrate change: %f' % util.total_bitrate_change)
         print('time average bitrate change: %f' %
             (util.total_bitrate_change * to_time_average))
@@ -1594,8 +1594,8 @@ def init(
         'total_rebuffer': util.rebuffer_time / 1000,
         'rebuffer_ratio': util.rebuffer_time / util.total_play_time,
         'time_average_rebuffer': util.rebuffer_time / 1000 * to_time_average,
-        'total_rebuffer_events': rebuffer_event_count,
-        'time_average_rebuffer_events': rebuffer_event_count * to_time_average,
+        'total_rebuffer_events': util.rebuffer_event_count,
+        'time_average_rebuffer_events': util.rebuffer_event_count * to_time_average,
         'total_bitrate_change': util.total_bitrate_change,
         'time_average_bitrate_change': util.total_bitrate_change * to_time_average,
         'total_log_bitrate_change': util.total_log_bitrate_change,
