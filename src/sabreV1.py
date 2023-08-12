@@ -1285,7 +1285,9 @@ def init(
     global pending_quality_up
     pending_quality_up = []
 
+    global rebuffer_event_count
     rebuffer_event_count = 0
+    global rebuffer_time
     rebuffer_time = 0
     global played_utility
     played_utility = 0
@@ -1320,8 +1322,11 @@ def init(
 
     global manifest
     manifest = util.load_json(movie)
+    global bitrates
     bitrates = manifest['bitrates_kbps']
+    global utility_offset
     utility_offset = 0 - math.log(bitrates[0])  # so utilities[0] = 0
+    global utilities
     utilities = [math.log(b) + utility_offset for b in bitrates]
     if movie_length != None:
         l1 = len(manifest['segment_sizes_bits'])
@@ -1335,6 +1340,7 @@ def init(
                             segments=manifest['segment_sizes_bits'])
     SessionInfo.manifest = manifest
 
+    global network_trace
     network_trace = util.load_json(network)
     network_trace = [NetworkPeriod(time=p['duration_ms'],
                                    bandwidth=p['bandwidth_kbps'] *
