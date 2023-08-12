@@ -2,12 +2,12 @@ import unittest
 import sys
 sys.path.append('/Users/prabu/git/sabre')
 
-from src.sabreOriginal import init as initSabreOriginal
-from src.sabre import init as initSabre
-from src.sabreNew2 import init as initSabreNew
+from src.sabreV1 import init as initSabreV1 # Having this for testing purposes
+from src.sabreV2 import init as initSabreV2 # Working on this
 
 class TestMainFunction(unittest.TestCase):
 
+    # Values from original Sabre in default mode.
     originalResult = {
             'buffer_size': 25000,
             'total_played_utility': 484.9654794493675,
@@ -30,32 +30,15 @@ class TestMainFunction(unittest.TestCase):
             'estimate': -234.28114307059911
         }
 
-    # def testCheckValuesWithOriginal(self):
-    #     '''
-    #     Testing original values against sabreOriginal.py
-    #     '''
-    #     resultSabreOriginal = initSabreOriginal()
-    #     for key in self.originalResult:
-    #         self.assertEqual(self.originalResult[key], resultSabreOriginal[key])
-
-    # def testCheckValuesWithSabre(self):
-    #     '''
-    #     Testing original values against sabre.py
-    #     '''
-    #     resultSabreOriginal = initSabre()
-    #     for key in self.originalResult:
-    #         self.assertEqual(self.originalResult[key], resultSabreOriginal[key])
-
-    def testCheckValuesAgainstSabreNew(self):
+    def testCheckValuesWithSabreV1(self):
         '''
-        Testing sabre.py against sabreNew.py
+        Testing original values against sabre.py
         '''
-        resultSabre = initSabre()
-        resultSabreNew = initSabreNew()
-        for key in resultSabre:
-            self.assertEqual(resultSabre[key], resultSabreNew[key])
+        resultSabreOriginal = initSabreV1()
+        for key in self.originalResult:
+            self.assertEqual(self.originalResult[key], resultSabreOriginal[key])
 
-    def testCheckValuesAgainstSabreNewAllOptions(self):
+    def testCheckValuesAgainstSabreV2(self):
         '''
         Testing sabre.py against sabreNew.py
         '''
@@ -64,11 +47,11 @@ class TestMainFunction(unittest.TestCase):
         for abr in abrList:
             for average in averageList:
                 print('Testing: ', abr, average)
-                resultSabreNew = initSabreNew(abr=abr, moving_average=average, verboseInput=False)
-                resultSabre = initSabre(abr=abr, moving_average=average, verboseInput=False)
+                resultSabreV1 = initSabreV1(abr=abr, moving_average=average, verboseInput=False)
+                resultSabreV2 = initSabreV2(abr=abr, moving_average=average, verboseInput=False)
                 
-                for key in resultSabre:
-                    self.assertEqual(resultSabre[key], resultSabreNew[key])
+                for key in resultSabreV1:
+                    self.assertEqual(resultSabreV1[key], resultSabreV2[key])
 
 if __name__ == '__main__':
     unittest.main()
