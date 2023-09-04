@@ -3,7 +3,8 @@ import sys
 sys.path.append('/Users/prabu/git/sabre')
 
 from src.sabreV1 import init as initSabreV1 # Having this for testing purposes
-from src.sabreV2 import init as initSabreV2 # Working on this
+from src.sabreV2 import init as initSabreV2 # Encapsulation done
+from src.sabreV3 import Sabre as SabreV3 # Working on this
 
 class TestMainFunction(unittest.TestCase):
 
@@ -52,6 +53,21 @@ class TestMainFunction(unittest.TestCase):
                 
                 for key in resultSabreV1:
                     self.assertEqual(resultSabreV1[key], resultSabreV2[key])
+
+    def testCheckValuesAgainstSabreV3(self):
+        '''
+        Testing sabre.py against sabreNew.py
+        '''
+        abrList = ['bola', 'bolae', 'throughput', 'dynamic', 'dynamicdash']
+        averageList = ['ewma', 'sliding']
+        for abr in abrList:
+            for average in averageList:
+                print('Testing: ', abr, average)
+                resultSabreV2 = initSabreV2(abr=abr, moving_average=average, verbose=False)
+                resultSabreV3 = SabreV3(abr=abr, moving_average=average, verbose=False).step()
+                
+                for key in resultSabreV2:
+                    self.assertEqual(resultSabreV2[key], resultSabreV3[key])
 
 if __name__ == '__main__':
     unittest.main()
