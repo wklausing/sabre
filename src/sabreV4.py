@@ -76,6 +76,9 @@ class Util:
         return obj
 
     def get_buffer_level(self):
+        '''
+        Probably the amount of time stored in the buffer.
+        '''
         return self.manifest.segment_time * len(self.buffer_contents) - self.buffer_fcc
 
     def deplete_buffer(self, time):
@@ -198,6 +201,9 @@ class NetworkModel:
     min_progress_size = 12000
     min_progress_time = 50
 
+    userSetNetworkCondition = False
+    userCount = 0
+
     def __init__(self, network_trace, util):
         self.util = util
 
@@ -208,7 +214,17 @@ class NetworkModel:
         self.time_to_next = 0
         self.next_network_period()
 
+    def setNetworkCondition(self, count, time, bandwidth, latency):
+        self.userCount = count
+        #self.userSetNetworkCondition = True
+        self.userSetTime = time
+        self.userSetLatency = latency
+        self.userSetBandwidth = bandwidth
+
     def next_network_period(self):
+        '''
+        Changes network conditions, according to network.json
+        '''
         self.index += 1
         if self.index == len(self.trace):
             self.index = 0
@@ -228,15 +244,17 @@ class NetworkModel:
                 previous_sustainable_quality != None):
             self.util.advertize_new_network_quality(
                 self.util.sustainable_quality, previous_sustainable_quality)
-
+            
         if self.util.verbose:
             print('[%d] Network: %d,%d  (q=%d: bitrate=%d)' %
-                  (round(self.util.network_total_time),
-                   self.trace[self.index].bandwidth, self.trace[self.index].latency,
-                   self.util.sustainable_quality, self.util.manifest.bitrates[self.util.sustainable_quality]))
+                (round(self.util.network_total_time),
+                self.trace[self.index].bandwidth, self.trace[self.index].latency,
+                self.util.sustainable_quality, self.util.manifest.bitrates[self.util.sustainable_quality]))
 
-    # return delay time
     def do_latency_delay(self, delay_units):
+        '''
+        Return delay time
+        '''
         total_delay = 0
         while delay_units > 0:
             current_latency = self.trace[self.index].latency
@@ -254,8 +272,10 @@ class NetworkModel:
                 self.next_network_period()
         return total_delay
 
-    # return download time
     def do_download(self, size):
+        '''
+        Return download time
+        '''
         total_download_time = 0
         while size > 0:
             current_bandwidth = self.trace[self.index].bandwidth
@@ -344,6 +364,9 @@ class NetworkModel:
         return (total_size, total_time)
 
     def delay(self, time):
+        '''
+        I think, it is the delay till the next download. 
+        '''
         while time > self.time_to_next:
             time -= self.time_to_next
             self.util.network_total_time += self.time_to_next
@@ -352,14 +375,16 @@ class NetworkModel:
         self.util.network_total_time += time
 
     def download(self, size, idx, quality, buffer_level, check_abandon=None):
-        if size <= 0:
+        '''
+        Returns tuple of DownloadProgress.
+        '''
+        if size <= 0:# If size is not positive, than return 
             return self.DownloadProgress(index=idx, quality=quality,
                                          size=0, downloaded=0,
                                          time=0, time_to_first_bit=0,
                                          abandon_to_quality=None)
 
-        if not check_abandon or (NetworkModel.min_progress_time <= 0 and
-                                 NetworkModel.min_progress_size <= 0):
+        if not check_abandon:
             latency = self.do_latency_delay(1)
             time = latency + self.do_download(size)
             return self.DownloadProgress(index=idx, quality=quality,
@@ -424,14 +449,6 @@ class NetworkModel:
                                      abandon_to_quality=abandon_quality)
 
 
-class ThroughputHistory:
-    def __init__(self, config):
-        pass
-
-    def push(self, time, tput, lat):
-        raise NotImplementedError
-
-
 class SessionInfo:
 
     def __init__(self, util):
@@ -444,50 +461,12 @@ class SessionInfo:
         return self.util.buffer_contents[:]
 
 
-class Abr:
+class ThroughputHistory:
+    def __init__(self, config):
+        pass
 
-    def __init__(self, config, util):
-        self.util = util
-        self.session = util.session_info
-
-    def get_quality_delay(self, segment_index):
+    def push(self, time, tput, lat):
         raise NotImplementedError
-
-    def get_first_quality(self):
-        return 0
-
-    def report_delay(self, delay):
-        pass
-
-    def report_download(self, metrics, is_replacment):
-        pass
-
-    def report_seek(self, where):
-        pass
-
-    def check_abandon(self, progress, buffer_level):
-        return None
-
-    def quality_from_throughput(self, tput):
-        p = self.util.manifest.segment_time
-        quality = 0
-        while (quality + 1 < len(self.util.manifest.bitrates) and
-               self.util.latency + p * self.util.manifest.bitrates[quality + 1] / tput <= p):
-            quality += 1
-        return quality
-
-
-class Replacement:
-
-    def __init__(self, util) -> None:
-        self.util = util
-        self.session = util.session_info
-
-    def check_replace(self, quality):
-        return None
-
-    def check_abandon(self, progress, buffer_level):
-        return None
 
 
 class SlidingWindow(ThroughputHistory):
@@ -581,6 +560,39 @@ class Ewma(ThroughputHistory):
             lat = l if lat == None else max(lat, l)  # conservative case is max
         self.util.throughput = tput
         self.util.latency = lat
+
+
+class Abr:
+
+    def __init__(self, config, util):
+        self.util = util
+        self.session = util.session_info
+
+    def get_quality_delay(self, segment_index):
+        raise NotImplementedError
+
+    def get_first_quality(self):
+        return 0
+
+    def report_delay(self, delay):
+        pass
+
+    def report_download(self, metrics, is_replacment):
+        pass
+
+    def report_seek(self, where):
+        pass
+
+    def check_abandon(self, progress, buffer_level):
+        return None
+
+    def quality_from_throughput(self, tput):
+        p = self.util.manifest.segment_time
+        quality = 0
+        while (quality + 1 < len(self.util.manifest.bitrates) and
+               self.util.latency + p * self.util.manifest.bitrates[quality + 1] / tput <= p):
+            quality += 1
+        return quality
 
 
 class Bola(Abr):
@@ -806,9 +818,6 @@ class BolaEnh(Abr):
         return self.Vp * (self.utilities[quality] + self.gp)
 
     def get_quality_delay(self, segment_index):
-        # global buffer_contents
-        # global buffer_fcc
-        # global throughput
 
         buffer_level = self.util.get_buffer_level()
 
@@ -1127,10 +1136,49 @@ class Bba(Abr):
         pass
 
 
+class AbrInput(Abr):
+
+    def __init__(self, path, config):
+        self.name = os.path.splitext(os.path.basename(path))[0]
+        self.abr_module = SourceFileLoader(self.name, path).load_module()
+        self.abr_class = getattr(self.abr_module, self.name)
+        self.abr_class.session = self.util.session_info
+        self.abr = self.abr_class(config)
+
+    def get_quality_delay(self, segment_index):
+        return self.abr.get_quality_delay(segment_index)
+
+    def get_first_quality(self):
+        return self.abr.get_first_quality()
+
+    def report_delay(self, delay):
+        self.abr.report_delay(delay)
+
+    def report_download(self, metrics, is_replacment):
+        self.abr.report_download(metrics, is_replacment)
+
+    def report_seek(self, where):
+        self.abr.report_seek(where)
+
+    def check_abandon(self, progress, buffer_level):
+        return self.abr.check_abandon(progress, buffer_level)
+
+
+class Replacement:
+
+    def __init__(self, util) -> None:
+        self.util = util
+        self.session = util.session_info
+
+    def check_replace(self, quality):
+        return None
+
+    def check_abandon(self, progress, buffer_level):
+        return None
+
+
 class NoReplace(Replacement):
     pass
-
-# TODO: different classes instead of strategy
 
 
 class Replace(Replacement):
@@ -1148,12 +1196,15 @@ class Replace(Replacement):
 
         self.replacing = None
 
+        print(self.strategy)
+
         if self.strategy == 0:
 
             skip = math.ceil(1.5 + self.util.buffer_fcc / self.util.manifest.segment_time)
             # print('skip = %d  fcc = %d' % (skip, buffer_fcc))
             for i in range(skip, len(self.util.buffer_contents)):
                 if self.util.buffer_contents[i] < quality:
+                    print('Here')
                     self.replacing = i - len(self.util.buffer_contents)
                     break
 
@@ -1193,34 +1244,6 @@ class Replace(Replacement):
         return None
 
 
-class AbrInput(Abr):
-
-    def __init__(self, path, config):
-        self.name = os.path.splitext(os.path.basename(path))[0]
-        self.abr_module = SourceFileLoader(self.name, path).load_module()
-        self.abr_class = getattr(self.abr_module, self.name)
-        self.abr_class.session = self.util.session_info
-        self.abr = self.abr_class(config)
-
-    def get_quality_delay(self, segment_index):
-        return self.abr.get_quality_delay(segment_index)
-
-    def get_first_quality(self):
-        return self.abr.get_first_quality()
-
-    def report_delay(self, delay):
-        self.abr.report_delay(delay)
-
-    def report_download(self, metrics, is_replacment):
-        self.abr.report_download(metrics, is_replacment)
-
-    def report_seek(self, where):
-        self.abr.report_seek(where)
-
-    def check_abandon(self, progress, buffer_level):
-        return self.abr.check_abandon(progress, buffer_level)
-
-
 class ReplacementInput(Replacement):
 
     def __init__(self, path):
@@ -1231,8 +1254,8 @@ class ReplacementInput(Replacement):
         self.replacement_class.session = self.util.session_info
         self.replacement = self.replacement_class()
 
-    def check_replace(self, quality):
-        return self.replacement.check_replace(quality)
+    # def check_replace(self, quality):
+    #     return self.replacement.check_replace(quality)
 
     def check_abandon(self, progress, buffer_level):
         return self.replacement.check_abandon(progress, buffer_level)
@@ -1371,8 +1394,15 @@ class Sabre():
 
     def step(self):
         '''
-        Loads one segment each call. 
+        Loads one segment each call. Does this make sense? 
         '''
+
+        if self.firstSegment:
+            self.next_segment = 0
+        print('self.next_segment: ', self.next_segment)
+        
+        time = None
+
         # TODO Here is start of initialisation
         # download first segment
         if self.firstSegment: 
@@ -1398,30 +1428,20 @@ class Sabre():
 
             self.next_segment = 1
             self.abandoned_to_quality = None
+            time = startup_time
         else:   
             # download rest of segments
 
-            # Here is final segment
+            # Here is final playout of buffer at the end.
             if self.next_segment == len(self.util.manifest.segments): 
                 self.util.playout_buffer()
                 result = self.printResults()
                 return result
 
-            # TODO: BEGIN TODO: reimplement seeking - currently only proof-of-concept hack
-            if self.seek != None:
-                if self.next_segment * self.util.manifest.segment_time >= 1000 * self.seek[0]:
-                    self.next_segment = math.floor(
-                        1000 * self.seek[1] / self.util.manifest.segment_time)
-                    self.util.buffer_contents = []
-                    self.util.buffer_fcc = 0
-                    self.abr.report_seek(1000 * self.seek[1])
-                    self.seek = None
-                    self.util.rampup_origin = self.util.total_play_time
-                    self.util.rampup_time = None
-            # TODO:  END TODO:  reimplement seeking - currently only proof-of-concept hack
-
             # do we have space for a new segment on the buffer?
             full_delay = self.util.get_buffer_level() + self.util.manifest.segment_time - self.buffer_size
+            #print(full_delay, self.util.get_buffer_level(), self.util.manifest.segment_time, self.buffer_size)
+
             if full_delay > 0:
                 self.util.deplete_buffer(full_delay)
                 self.network.delay(full_delay)
@@ -1429,10 +1449,13 @@ class Sabre():
                 if self.util.verbose:
                     print('full buffer delay %d bl=%d' %
                         (full_delay, self.util.get_buffer_level()))
+                return full_delay
 
             if self.abandoned_to_quality == None:
                 (quality, delay) = self.abr.get_quality_delay(self.next_segment)
+                print('Quality: %d | delay: %d ' % (quality, delay))
                 replace = self.replacer.check_replace(quality)
+                print('Replace: ' , replace)
             else:
                 (quality, delay) = (self.abandoned_to_quality, 0)
                 replace = None
@@ -1489,12 +1512,11 @@ class Sabre():
                             self.util.get_buffer_level()),
                             end='')
 
-            # print('deplete buffer %d' % download_metric.time)
             self.util.deplete_buffer(download_metric.time)
             if self.util.verbose:
                 print('->%d' % self.util.get_buffer_level(), end='')
 
-            # update buffer with new download
+            # Update buffer with new download
             if replace == None:
                 if download_metric.abandon_to_quality == None:
                     self.util.buffer_contents += [quality]
@@ -1502,7 +1524,6 @@ class Sabre():
                 else:
                     self.abandon_to_quality = download_metric.abandon_to_quality
             else:
-                # abandon_to_quality == None
                 if download_metric.abandon_to_quality == None:
                     if self.util.get_buffer_level() + self.util.manifest.segment_time * replace >= 0:
                         self.util.buffer_contents[replace] = quality
@@ -1539,11 +1560,10 @@ class Sabre():
             if download_metric.abandon_to_quality == None:
                 self.throughput_history.push(download_time, t, l)
 
+            return download_time
             # loop while next_segment < len(manifest.segments)
 
-        return {}
-        # TODO Here is end
-
+        return time
     
     def printResults(self):
         to_time_average = 1 / (self.util.total_play_time / self.util.manifest.segment_time)
@@ -1630,12 +1650,28 @@ class Sabre():
         For test cases
         '''
         result = {}
-        while len(result) == 0:
+
+        i = 0
+
+        while True:
+            if isinstance(result, dict) and len(result) > 10: break
+
+            if i == 300:
+                print('Here network changes')
+                self.network.setNetworkCondition(10, 30000, 500, 1075)
             result = self.step()
+            
+            
+            if isinstance(result, float): 
+                print(str(round(result/1000, 2)) + ' s')
+            else: 
+                print(result)
+
+            print('i ', i)
+            i += 1
         return result
 
 
-
 if __name__ == '__main__':
-    sabre = Sabre(verbose=False)
+    sabre = Sabre(verbose=True, abr='throughput', moving_average='ewma', replace='right')
     sabre.testing()

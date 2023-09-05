@@ -5,6 +5,7 @@ sys.path.append('/Users/prabu/git/sabre')
 from src.sabreV1 import init as initSabreV1 # Having this for testing purposes
 from src.sabreV2 import init as initSabreV2 # Encapsulation done
 from src.sabreV3 import Sabre as SabreV3 # Working on this
+from src.sabreV4 import Sabre as SabreV4 # Working on this
 
 class TestMainFunction(unittest.TestCase):
 
@@ -31,43 +32,58 @@ class TestMainFunction(unittest.TestCase):
             'estimate': -234.28114307059911
         }
 
-    def testCheckValuesWithSabreV1(self):
-        '''
-        Testing original values against sabre.py
-        '''
-        resultSabreOriginal = initSabreV1()
-        for key in self.originalResult:
-            self.assertEqual(self.originalResult[key], resultSabreOriginal[key])
+    # def testCheckValuesWithSabreV1(self):
+    #     '''
+    #     Testing original values against sabre.py
+    #     '''
+    #     resultSabreOriginal = initSabreV1()
+    #     for key in self.originalResult:
+    #         self.assertEqual(self.originalResult[key], resultSabreOriginal[key])
 
-    def testCheckValuesAgainstSabreV2(self):
+    # def testCheckValuesAgainstSabreV2(self):
+    #     '''
+    #     Testing sabreV1.py against sabreV2.py
+    #     '''
+    #     abrList = ['bola', 'bolae', 'throughput', 'dynamic', 'dynamicdash']
+    #     averageList = ['ewma', 'sliding']
+    #     for abr in abrList:
+    #         for average in averageList:
+    #             print('Testing: ', abr, average)
+    #             resultSabreV1 = initSabreV1(abr=abr, moving_average=average, verboseInput=False)
+    #             resultSabreV2 = initSabreV2(abr=abr, moving_average=average, verbose=False)
+                
+    #             for key in resultSabreV1:
+    #                 self.assertEqual(resultSabreV1[key], resultSabreV2[key])
+
+    # def testCheckValuesAgainstSabreV3(self):
+    #     '''
+    #     Testing sabreV2.py against sabreV3.py
+    #     '''
+    #     abrList = ['bola', 'bolae', 'throughput', 'dynamic', 'dynamicdash']
+    #     averageList = ['ewma', 'sliding']
+    #     for abr in abrList:
+    #         for average in averageList:
+    #             print('Testing: ', abr, average)
+    #             resultSabreV2 = initSabreV2(abr=abr, moving_average=average, verbose=False)
+    #             resultSabreV3 = SabreV3(abr=abr, moving_average=average, verbose=False).testing()
+                
+    #             for key in resultSabreV2:
+    #                 self.assertEqual(resultSabreV2[key], resultSabreV3[key])
+
+    def testCheckValuesAgainstSabreV4(self):
         '''
-        Testing sabre.py against sabreNew.py
+        Testing sabreV2.py against sabreV3.py
         '''
         abrList = ['bola', 'bolae', 'throughput', 'dynamic', 'dynamicdash']
         averageList = ['ewma', 'sliding']
         for abr in abrList:
             for average in averageList:
                 print('Testing: ', abr, average)
-                resultSabreV1 = initSabreV1(abr=abr, moving_average=average, verboseInput=False)
-                resultSabreV2 = initSabreV2(abr=abr, moving_average=average, verbose=False)
-                
-                for key in resultSabreV1:
-                    self.assertEqual(resultSabreV1[key], resultSabreV2[key])
-
-    def testCheckValuesAgainstSabreV3(self):
-        '''
-        Testing sabre.py against sabreNew.py
-        '''
-        abrList = ['bola', 'bolae', 'throughput', 'dynamic', 'dynamicdash']
-        averageList = ['ewma', 'sliding']
-        for abr in abrList:
-            for average in averageList:
-                print('Testing: ', abr, average)
-                resultSabreV2 = initSabreV2(abr=abr, moving_average=average, verbose=False)
-                resultSabreV3 = SabreV3(abr=abr, moving_average=average, verbose=False).step()
-                
-                for key in resultSabreV2:
-                    self.assertEqual(resultSabreV2[key], resultSabreV3[key])
+                resultSabreV3 = SabreV3(abr=abr, moving_average=average, verbose=False,  replace='right').testing()
+                resultSabreV4 = SabreV4(abr=abr, moving_average=average, verbose=False,  replace='right').testing()
+                for key in resultSabreV3:
+                    self.assertEqual(resultSabreV3[key], resultSabreV4[key])
+        
 
 if __name__ == '__main__':
     unittest.main()
