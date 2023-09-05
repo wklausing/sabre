@@ -41,7 +41,7 @@ class TestMainFunction(unittest.TestCase):
 
     def testCheckValuesAgainstSabreV2(self):
         '''
-        Testing sabre.py against sabreNew.py
+        Testing sabreV1.py against sabreV2.py
         '''
         abrList = ['bola', 'bolae', 'throughput', 'dynamic', 'dynamicdash']
         averageList = ['ewma', 'sliding']
@@ -56,7 +56,7 @@ class TestMainFunction(unittest.TestCase):
 
     def testCheckValuesAgainstSabreV3(self):
         '''
-        Testing sabre.py against sabreNew.py
+        Testing sabreV2.py against sabreV3.py
         '''
         abrList = ['bola', 'bolae', 'throughput', 'dynamic', 'dynamicdash']
         averageList = ['ewma', 'sliding']
@@ -64,7 +64,7 @@ class TestMainFunction(unittest.TestCase):
             for average in averageList:
                 print('Testing: ', abr, average)
                 resultSabreV2 = initSabreV2(abr=abr, moving_average=average, verbose=False)
-                resultSabreV3 = SabreV3(abr=abr, moving_average=average, verbose=False).step()
+                resultSabreV3 = SabreV3(abr=abr, moving_average=average, verbose=False).testing()
                 
                 for key in resultSabreV2:
                     self.assertEqual(resultSabreV2[key], resultSabreV3[key])

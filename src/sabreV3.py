@@ -1261,6 +1261,7 @@ class Sabre():
     util = Util()
     throughput_history = None
     abr = None
+    firstSegment = True
 
     def __init__(
         self,
@@ -1369,37 +1370,47 @@ class Sabre():
         self.throughput_history = average_list[moving_average](config, self.util)
 
     def step(self):
-        # TODO Here is start
+        '''
+        Loads one segment each call. 
+        '''
+        # TODO Here is start of initialisation
         # download first segment
-        quality = self.abr.get_first_quality()
-        size = self.util.manifest.segments[0][quality]
-        download_metric = self.network.download(size, 0, quality, 0)
-        download_time = download_metric.time - download_metric.time_to_first_bit
-        startup_time = download_time
-        self.util.buffer_contents.append(download_metric.quality)
-        t = download_metric.size / download_time
-        l = download_metric.time_to_first_bit
-        self.throughput_history.push(download_time, t, l)
-        # print('%d,%d -> %d,%d' % (t, l, throughput, latency))
-        self.util.total_play_time += download_metric.time
+        if self.firstSegment: 
+            quality = self.abr.get_first_quality()
+            size = self.util.manifest.segments[0][quality]
+            download_metric = self.network.download(size, 0, quality, 0)
+            download_time = download_metric.time - download_metric.time_to_first_bit
+            startup_time = download_time
+            self.util.buffer_contents.append(download_metric.quality)
+            t = download_metric.size / download_time # t represents throughput per ms
+            l = download_metric.time_to_first_bit
+            self.throughput_history.push(download_time, t, l)
+            self.util.total_play_time += download_metric.time
 
-        if self.util.verbose:
-            print('[%d-%d]  %d: q=%d s=%d/%d t=%d=%d+%d bl=0->0->%d' %
-                (0, round(download_metric.time), 0, download_metric.quality,
-                download_metric.downloaded, download_metric.size,
-                download_metric.time, download_metric.time_to_first_bit,
-                download_metric.time - download_metric.time_to_first_bit,
-                self.util.get_buffer_level()))
+            if self.util.verbose:
+                print('[%d-%d]  %d: q=%d s=%d/%d t=%d=%d+%d bl=0->0->%d' %
+                    (0, round(download_metric.time), 0, download_metric.quality,
+                    download_metric.downloaded, download_metric.size,
+                    download_metric.time, download_metric.time_to_first_bit,
+                    download_metric.time - download_metric.time_to_first_bit,
+                    self.util.get_buffer_level()))
+            self.firstSegment = False
 
-        # download rest of segments
-        next_segment = 1
-        abandoned_to_quality = None
-        while next_segment < len(self.util.manifest.segments):
+            self.next_segment = 1
+            self.abandoned_to_quality = None
+        else:   
+            # download rest of segments
+
+            # Here is final segment
+            if self.next_segment == len(self.util.manifest.segments): 
+                self.util.playout_buffer()
+                result = self.printResults()
+                return result
 
             # TODO: BEGIN TODO: reimplement seeking - currently only proof-of-concept hack
             if self.seek != None:
-                if next_segment * self.util.manifest.segment_time >= 1000 * self.seek[0]:
-                    next_segment = math.floor(
+                if self.next_segment * self.util.manifest.segment_time >= 1000 * self.seek[0]:
+                    self.next_segment = math.floor(
                         1000 * self.seek[1] / self.util.manifest.segment_time)
                     self.util.buffer_contents = []
                     self.util.buffer_fcc = 0
@@ -1419,20 +1430,20 @@ class Sabre():
                     print('full buffer delay %d bl=%d' %
                         (full_delay, self.util.get_buffer_level()))
 
-            if abandoned_to_quality == None:
-                (quality, delay) = self.abr.get_quality_delay(next_segment)
+            if self.abandoned_to_quality == None:
+                (quality, delay) = self.abr.get_quality_delay(self.next_segment)
                 replace = self.replacer.check_replace(quality)
             else:
-                (quality, delay) = (abandoned_to_quality, 0)
+                (quality, delay) = (self.abandoned_to_quality, 0)
                 replace = None
-                abandon_to_quality = None
+                self.abandon_to_quality = None
 
             if replace != None:
                 delay = 0
-                current_segment = next_segment + replace
+                current_segment = self.next_segment + replace
                 check_abandon = self.replacer.check_abandon
             else:
-                current_segment = next_segment
+                current_segment = self.next_segment
                 check_abandon = self.abr.check_abandon
             if self.no_abandon:
                 check_abandon = None
@@ -1445,16 +1456,8 @@ class Sabre():
                 if self.util.verbose:
                     print('abr delay %d bl=%d' % (delay, self.util.get_buffer_level()))
 
-            # print('size %d, current_segment %d, quality %d, buffer_level %d' %
-            #      (size, current_segment, quality, get_buffer_level()))
-
             download_metric = self.network.download(size, current_segment, quality,
                                             self.util.get_buffer_level(), check_abandon)
-
-            # print('index %d, quality %d, downloaded %d/%d, time %d=%d+.' %
-            #      (download_metric.index, download_metric.quality,
-            #       download_metric.downloaded, download_metric.size,
-            #       download_metric.time, download_metric.time_to_first_bit))
 
             if self.util.verbose:
                 print('[%d-%d]  %d: q=%d s=%d/%d t=%d=%d+%d ' %
@@ -1495,9 +1498,9 @@ class Sabre():
             if replace == None:
                 if download_metric.abandon_to_quality == None:
                     self.util.buffer_contents += [quality]
-                    next_segment += 1
+                    self.next_segment += 1
                 else:
-                    abandon_to_quality = download_metric.abandon_to_quality
+                    self.abandon_to_quality = download_metric.abandon_to_quality
             else:
                 # abandon_to_quality == None
                 if download_metric.abandon_to_quality == None:
@@ -1538,15 +1541,17 @@ class Sabre():
 
             # loop while next_segment < len(manifest.segments)
 
-        self.util.playout_buffer()
+        return {}
         # TODO Here is end
 
-        # multiply by to_time_average to get per/chunk average
+    
+    def printResults(self):
         to_time_average = 1 / (self.util.total_play_time / self.util.manifest.segment_time)
-        count = len(self.util.manifest.segments)
-        time = count * self.util.manifest.segment_time + self.util.rebuffer_time + startup_time
-
         if self.util.verbose:
+            # multiply by to_time_average to get per/chunk average
+            count = len(self.util.manifest.segments)
+            #time = count * self.util.manifest.segment_time + self.util.rebuffer_time + startup_time
+
             print('buffer size: %d' % self.buffer_size)
             print('total played utility: %f' % self.util.played_utility)
             print('time average played utility: %f' %
@@ -1619,9 +1624,18 @@ class Sabre():
             print(results_dict)
 
         return results_dict
+    
+    def testing(self):
+        '''
+        For test cases
+        '''
+        result = {}
+        while len(result) == 0:
+            result = self.step()
+        return result
+
 
 
 if __name__ == '__main__':
-    sabre = Sabre()
-    sabre.init()
-    result = sabre.step()
+    sabre = Sabre(verbose=False)
+    sabre.testing()
