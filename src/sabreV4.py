@@ -214,19 +214,26 @@ class NetworkModel:
         self.time_to_next = 0
         self.next_network_period()
 
-    def setNetworkCondition(self, count, time, bandwidth, latency):
-        self.userCount = count
-        #self.userSetNetworkCondition = True
-        self.userSetTime = time
-        self.userSetLatency = latency
-        self.userSetBandwidth = bandwidth
+    def add_network_condition(self, duration_ms, bandwidth_kbps, latency_ms):
+        '''
+        Adds a new network condition to self.trace. Will be removed after one use.
+        '''
+        network_trace = NetworkPeriod(time=duration_ms,
+                                    bandwidth=bandwidth_kbps *
+                                    1,
+                                    latency=latency_ms,
+                                    permanent=False)
+        self.trace.append(network_trace)
 
     def next_network_period(self):
         '''
-        Changes network conditions, according to network.json
+        Changes network conditions, according to self.trace
         '''
+        if not self.trace[self.index].permanent:
+            del self.trace[self.index]
+
         self.index += 1
-        if self.index == len(self.trace):
+        if self.index >= len(self.trace):
             self.index = 0
         self.time_to_next = self.trace[self.index].time
 
@@ -702,7 +709,7 @@ class Bola(Abr):
         score = (
             self.Vp * (self.gp + self.utilities[progress.quality]) - buffer_level) / remain
         if score < 0:
-            return  # TODO: check
+            return
 
         for q in range(progress.quality):
             other_size = progress.size * \
@@ -1196,7 +1203,7 @@ class Replace(Replacement):
 
         self.replacing = None
 
-        print(self.strategy)
+        #print(self.strategy)
 
         if self.strategy == 0:
 
@@ -1263,7 +1270,7 @@ class ReplacementInput(Replacement):
 
 ManifestInfo = namedtuple(
     'ManifestInfo', 'segment_time bitrates utilities segments')
-NetworkPeriod = namedtuple('NetworkPeriod', 'time bandwidth latency')
+NetworkPeriod = namedtuple('NetworkPeriod', 'time bandwidth latency permanent')
 
 average_default = 'ewma'
 average_list = {}
@@ -1359,7 +1366,8 @@ class Sabre():
         network_trace = [NetworkPeriod(time=p['duration_ms'],
                                     bandwidth=p['bandwidth_kbps'] *
                                     network_multiplier,
-                                    latency=p['latency_ms'])
+                                    latency=p['latency_ms'],
+                                    permanent=True)
                         for p in network_trace]
 
         self.buffer_size = max_buffer * 1000
@@ -1399,7 +1407,7 @@ class Sabre():
 
         if self.firstSegment:
             self.next_segment = 0
-        print('self.next_segment: ', self.next_segment)
+        #print('self.next_segment: ', self.next_segment)
         
         time = None
 
@@ -1449,13 +1457,12 @@ class Sabre():
                 if self.util.verbose:
                     print('full buffer delay %d bl=%d' %
                         (full_delay, self.util.get_buffer_level()))
-                return full_delay
 
             if self.abandoned_to_quality == None:
                 (quality, delay) = self.abr.get_quality_delay(self.next_segment)
-                print('Quality: %d | delay: %d ' % (quality, delay))
+                #print('Quality: %d | delay: %d ' % (quality, delay))
                 replace = self.replacer.check_replace(quality)
-                print('Replace: ' , replace)
+                #print('Replace: ' , replace)
             else:
                 (quality, delay) = (self.abandoned_to_quality, 0)
                 replace = None
@@ -1560,8 +1567,19 @@ class Sabre():
             if download_metric.abandon_to_quality == None:
                 self.throughput_history.push(download_time, t, l)
 
-            return download_time
+            time = download_time
             # loop while next_segment < len(manifest.segments)
+
+
+        # print('self.buffer_size: ', self.buffer_size)
+        # to_time_average = 1 / (self.util.total_play_time / self.util.manifest.segment_time)
+        # print('time average played bitrate: %f' %
+        #         (self.util.played_bitrate * to_time_average))
+        
+        # print('time_average_bitrate_change:', self.util.total_bitrate_change * to_time_average)
+
+        # print('time average rebuffer events: %f' %
+        #         (self.util.rebuffer_event_count * to_time_average))
 
         return time
     
@@ -1656,22 +1674,22 @@ class Sabre():
         while True:
             if isinstance(result, dict) and len(result) > 10: break
 
-            if i == 300:
-                print('Here network changes')
-                self.network.setNetworkCondition(10, 30000, 500, 1075)
+            # if i == 200:
+            #     print('Here network changes')
+            #     self.network.add_network_condition(30000, 500, 500)
             result = self.step()
             
-            
-            if isinstance(result, float): 
-                print(str(round(result/1000, 2)) + ' s')
-            else: 
-                print(result)
+            # if isinstance(result, float): 
+            #     print(str(round(result/1000, 2)) + ' s')
+            # else: 
+            #     print(result)
 
-            print('i ', i)
+            # print('i ', i)
             i += 1
         return result
 
 
 if __name__ == '__main__':
-    sabre = Sabre(verbose=True, abr='throughput', moving_average='ewma', replace='right')
+    sabre = Sabre(verbose=False, abr='throughput', moving_average='ewma', replace='right', abr_osc=False)
     sabre.testing()
+
