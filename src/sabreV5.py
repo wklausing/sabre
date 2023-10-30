@@ -1309,7 +1309,7 @@ class Sabre():
         gamma_p=5,
         half_life=[3, 8],
         max_buffer=25,
-        movie='example/movie.json',
+        movie='example/movieRemoved.json',
         movie_length=None,
         moving_average=average_default,
         network='example/networkREMOVED.json',
@@ -1321,6 +1321,11 @@ class Sabre():
         seek=None,
         verbose=True,
         window_size=[3],
+        
+        # Movie information
+        bitrates = [],
+        segment_sizes_bits = [],
+        segment_duration_ms = 3000,
     ):  
         self.no_abandon = no_abandon
         self.seek = seek
@@ -1355,7 +1360,11 @@ class Sabre():
         self.util.max_buffer_size = max_buffer * 1000
 
         #TODO Also modify this accordingly.
-        self.util.manifest = self.util.load_json(movie)
+        self.util.manifest = {
+            'segment_duration_ms': 3000, 
+            'bitrates_kbps': [ 230, 331, 477, 688, 991, 1427, 2056, 2962, 5027, 6000 ],
+            'segment_sizes_bits': [[ 886360, 1180512, 1757888, 2321704, 3515816, 5140704, 7395048, 10097056, 17115584, 20657480 ]]
+        }
         bitrates = self.util.manifest['bitrates_kbps']
         utility_offset = 0 - math.log(bitrates[0])  # so utilities[0] = 0
         utilities = [math.log(b) + utility_offset for b in bitrates]
@@ -1407,14 +1416,41 @@ class Sabre():
         config = {'window_size': window_size, 'half_life': half_life}
         self.throughput_history = average_list[moving_average](config, self.util)
 
-    def downloadSegment(self, duration_ms=3000, bandwidth_kbps=5000, latency_ms=75):
+    def downloadSegment(self, 
+                        
+                        # Network conditions
+                        duration_ms=3000, 
+                        bandwidth_kbps=5000, 
+                        latency_ms=75,
+
+                        # Segment information
+                        # segment_duration_ms=3000,
+                        # bitrates_kbps=[],
+                        segment_sizes_bits=[],
+                        lastSegment = False,
+
+                        ):
         '''
         Loads one segment each call. First call starts download of media, while last ones is playing out buffer.
         '''
 
+        self.util.manifest = {
+            'segment_duration_ms': 3000, 
+            'bitrate_kbps': [ 230, 331, 477, 688, 991, 1427, 2056, 2962, 5027, 6000 ],
+            'segment_sizes_bits': [[ 886360, 1180512, 1757888, 2321704, 3515816, 5140704, 7395048, 10097056, 17115584, 20657480 ]]
+        }
+
+        bitrates = self.util.manifest['bitrate_kbps']
+        utility_offset = 0 - math.log(bitrates[0])  # so utilities[0] = 0
+        utilities = [math.log(b) + utility_offset for b in bitrates]
+
+        self.util.manifest = ManifestInfo(segment_time=self.util.manifest['segment_duration_ms'],
+                                    bitrates=bitrates,
+                                    utilities=utilities,
+                                    segments=self.util.manifest['segment_sizes_bits'])
+
         if self.firstSegment:
             self.next_segment = 0
-        #print('self.next_segment: ', self.next_segment)
         
         time = None
 
@@ -1449,7 +1485,7 @@ class Sabre():
             # download rest of segments
 
             # Here is final playout of buffer at the end.
-            if self.next_segment == len(self.util.manifest.segments): 
+            if lastSegment: 
                 self.util.playout_buffer()
                 result = self.printResults()
                 return result
@@ -1486,7 +1522,7 @@ class Sabre():
             if self.no_abandon:
                 check_abandon = None
 
-            size = self.util.manifest.segments[current_segment][quality]
+            size = self.util.manifest.segments[0][quality]
 
             if delay > 0:
                 self.util.deplete_buffer(delay)
@@ -1697,10 +1733,19 @@ class Sabre():
 
         i = 0
 
+        segment_sizes_bits=[ 718856, 1097088, 1471616, 1927704, 2243080, 3321576, 5718960, 8491768, 16026976, 19364840 ]
+        lastSegment = False
         while True:
             if isinstance(result, dict) and len(result) > 10: break            
-            result = self.downloadSegment()
+            
+            if i < 20:
+                result = self.downloadSegment(segment_sizes_bits=segment_sizes_bits)
+            else:
+                result = self.downloadSegment(lastSegment=True)
             i += 1
+
+            
+
         return result
 
 
