@@ -1729,27 +1729,38 @@ class Sabre():
         '''
         For test cases.
         '''
-        result = {}
+        def load_json(path):
+            with open(path) as file:
+                obj = json.load(file)
+            return obj
 
-        i = 0
+        movie='example/movie.json'
+        movie = load_json(movie)
 
-        segment_sizes_bits=[ 718856, 1097088, 1471616, 1927704, 2243080, 3321576, 5718960, 8491768, 16026976, 19364840 ]
-        lastSegment = False
-        while True:
-            if isinstance(result, dict) and len(result) > 10: break            
-            
-            if i < 20:
-                result = self.downloadSegment(segment_sizes_bits=segment_sizes_bits)
-            else:
-                result = self.downloadSegment(lastSegment=True)
-            i += 1
+        network='example/network.json'
+        network_multiplier = 1
 
-            
+        network_trace = load_json(network)
+        network_trace = [NetworkPeriod(time=p['duration_ms'],
+                                    bandwidth=p['bandwidth_kbps'] *
+                                    network_multiplier,
+                                    latency=p['latency_ms'],
+                                    permanent=True)
+                        for p in network_trace]
 
+        for index, segment in enumerate(movie['segment_sizes_bits']):
+            self.downloadSegment(
+                duration_ms=network_trace[index % 4].time, 
+                bandwidth_kbps=network_trace[index % 4].bandwidth, 
+                latency_ms=network_trace[index % 4].latency, 
+                segment_sizes_bits=segment
+            )
+        result = self.downloadSegment(lastSegment=True)
+        print(result)
         return result
 
 
 if __name__ == '__main__':
-    sabre = Sabre(verbose=True, abr='throughput', moving_average='ewma', replace='right', abr_osc=False)
+    sabre = Sabre(abr='bola', moving_average='ewma', verbose=False,  replace='right')
     sabre.testing()
 

@@ -1679,10 +1679,11 @@ class Sabre():
             if isinstance(result, dict) and len(result) > 10: break            
             result = self.downloadSegment()
             i += 1
+        print(result)
         return result
 
 
 if __name__ == '__main__':
-    sabre = Sabre(verbose=True, abr='throughput', moving_average='ewma', replace='right', abr_osc=False)
+    sabre = Sabre(abr='bola', moving_average='ewma', verbose=False,  replace='right')
     sabre.testing()
 
