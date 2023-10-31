@@ -1,12 +1,15 @@
 import unittest
 import sys
 sys.path.append('/Users/prabu/git/sabre')
+sys.path.append('/Users/prabu/git/sabre/src')
 
 from src.sabreV1 import init as initSabreV1 # Having this for testing purposes
 from src.sabreV2 import init as initSabreV2 # Encapsulation done
-from src.sabreV3 import Sabre as SabreV3 # Working on this
-from src.sabreV4 import Sabre as SabreV4 # Working on this
+from src.sabreV3 import Sabre as SabreV3
+from src.sabreV4 import Sabre as SabreV4
 from src.sabreV5 import Sabre as SabreV5 # Working on this
+
+#from src.gymSabre import SabreGym
 
 class TestMainFunction(unittest.TestCase):
 
@@ -95,11 +98,11 @@ class TestMainFunction(unittest.TestCase):
         for abr in abrList:
             for average in averageList:
                 print('Testing: ', abr, average)
-                resultSabreV3 = SabreV4(abr=abr, moving_average=average, verbose=False,  replace='right').testing()
-                resultSabreV4 = SabreV5(abr=abr, moving_average=average, verbose=False,  replace='right').testing()
-                for key in resultSabreV3:
+                resultSabreV4 = SabreV4(abr=abr, moving_average=average, verbose=False,  replace='right').testing()
+                resultSabreV5 = SabreV5(abr=abr, moving_average=average, verbose=False,  replace='right').testing()
+                for key in resultSabreV4:
                     print(key)
-                    self.assertEqual(resultSabreV3[key], resultSabreV4[key])
+                    self.assertEqual(resultSabreV4[key], resultSabreV5[key])
         
 
 if __name__ == '__main__':
