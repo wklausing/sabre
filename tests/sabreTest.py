@@ -103,6 +103,25 @@ class TestMainFunction(unittest.TestCase):
                 for key in resultSabreV4:
                     print(key)
                     self.assertEqual(resultSabreV4[key], resultSabreV5[key])
+
+    def testQoECalc(self):
+        '''
+        Example of calculating QoE with Sabre.
+        '''
+        # Bitrate - ReBuffering - BitrateSwichingEvents
+        sabre = SabreV5(abr='bola', moving_average='ewma', verbose=False,  replace='right')
+        result = {}
+        while True:
+            if isinstance(result, dict) and len(result) > 10: break            
+            result = sabre.downloadSegment()
+
+        bitrate = result['total_played_bitrate']
+        rebuffer = result['total_rebuffer']
+        bitrateSwitchingEvents = result['total_bitrate_change']
+        QoE = bitrate - rebuffer - bitrateSwitchingEvents
+        
+        print('QoE: ', QoE)
+        self.assertEqual(1, 1)
         
 
 if __name__ == '__main__':

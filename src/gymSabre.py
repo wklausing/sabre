@@ -1,10 +1,5 @@
 import json
 from collections import namedtuple
-
-
-
-firstRequest = True
-index = 0
     
 class SabreGym():
     index = -1
@@ -26,12 +21,15 @@ class SabreGym():
         return obj
 
     def getNextNetworkCondition(self):
-        self.index += 1
-        if self.index >= len(self.network_trace):
-            self.index = 0
-
-        trace = self.network_trace[self.index]
-        
+        trace = self.setNetworkCondition(time=1000, bandwidth=100, latency=100)
+        return trace
+    
+    def setNetworkCondition(self, time, bandwidth, latency, permanent=True):
+        trace = self.NetworkPeriod(time=time,
+                            bandwidth=bandwidth *
+                            self.network_multiplier,
+                            latency=latency,
+                            permanent=permanent)
         return trace
 
 if __name__ == '__main__':
@@ -40,5 +38,7 @@ if __name__ == '__main__':
     print(foo)
     foo = sabreGym.getNextNetworkCondition()
     print(foo)
+
+
 
 

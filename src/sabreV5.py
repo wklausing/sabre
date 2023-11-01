@@ -211,7 +211,7 @@ class NetworkModel:
 
         self.util.sustainable_quality = None
         self.util.network_total_time = 0
-        self.gymNetworkCondition = gym
+        self.gym = gym
         self.index = -1
         self.time_to_next = 0
         self.next_network_period()
@@ -231,7 +231,7 @@ class NetworkModel:
         '''
         Changes network conditions, according to self.trace
         '''
-        self.trace = self.gymNetworkCondition.getNextNetworkCondition()
+        self.trace = self.gym.getNextNetworkCondition()
 
         self.time_to_next = self.trace.time
 
@@ -1663,16 +1663,12 @@ class Sabre():
         '''
         result = {}
 
-        i = 0
-
         while True:
             if isinstance(result, dict) and len(result) > 10: break            
             result = self.downloadSegment()
-            i += 1
         return result
 
 
 if __name__ == '__main__':
     sabre = Sabre(gym=SabreGym(), verbose=True, abr='throughput', moving_average='ewma', replace='right', abr_osc=False)
     sabre.testing()
-
