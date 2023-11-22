@@ -251,12 +251,6 @@ class NetworkModel:
                 previous_sustainable_quality != None):
             self.util.advertize_new_network_quality(
                 self.util.sustainable_quality, previous_sustainable_quality)
-            
-        if self.util.verbose:
-            print('[%d] Network: %d,%d  (q=%d: bitrate=%d)' %
-                (round(self.util.network_total_time),
-                self.trace[self.index].bandwidth, self.trace[self.index].latency,
-                self.util.sustainable_quality, self.util.manifest.bitrates[self.util.sustainable_quality]))
 
     def _do_latency_delay(self, delay_units):
         '''
@@ -882,7 +876,6 @@ class BolaEnh(Abr):
                 self.ibr_safety, BolaEnh.low_buffer_safety_factor)
             for q in range(quality):
                 if self.util.manifest.bitrates[q + 1] * self.util.manifest.segment_time > safe_size:
-                    # print('InsufficientBufferRule %d -> %d' % (quality, q))
                     quality = q
                     delay = 0
                     min_level = self.min_buffer_for_quality(quality)
@@ -890,7 +883,6 @@ class BolaEnh(Abr):
                     self.placeholder = min(max_placeholder, self.placeholder)
                     break
 
-        # print('ph=%d' % self.placeholder)
         return (quality, delay)
 
     def report_delay(self, delay):
@@ -1194,16 +1186,10 @@ class Replace(Replacement):
         self.strategy = strategy
         self.replacing = None
         self.util = util
-        # self.replacing is either None or -ve index to buffer_contents
 
     def check_replace(self, quality):
-        # global manifest
-        # global buffer_contents
-        # global buffer_fcc
 
         self.replacing = None
-
-        #print(self.strategy)
 
         if self.strategy == 0:
 
@@ -1215,11 +1201,6 @@ class Replace(Replacement):
                     self.replacing = i - len(self.util.buffer_contents)
                     break
 
-            # if self.replacing == None:
-            #    print('no repl:  0/%d' % len(buffer_contents))
-            # else:
-            #    print('replace: %d/%d' % (self.replacing, len(buffer_contents)))
-
         elif self.strategy == 1:
 
             skip = math.ceil(1.5 + self.util.buffer_fcc / self.util.manifest.segment_time)
@@ -1228,21 +1209,12 @@ class Replace(Replacement):
                 if self.util.buffer_contents[i] < quality:
                     self.replacing = i - len(self.util.buffer_contents)
                     break
-
-            # if self.replacing == None:
-            #    print('no repl:  0/%d' % len(buffer_contents))
-            # else:
-            #    print('replace: %d/%d' % (self.replacing, len(buffer_contents)))
-
         else:
             pass
 
         return self.replacing
 
     def check_abandon(self, progress, buffer_level):
-        # global manifest
-        # global buffer_contents
-        # global buffer_fcc
 
         if self.replacing == None:
             return None
@@ -1425,13 +1397,6 @@ class Sabre():
             self.throughput_history.push(download_time, t, l)
             self.util.total_play_time += download_metric.time
 
-            if self.util.verbose:
-                print('[%d-%d]  %d: q=%d s=%d/%d t=%d=%d+%d bl=0->0->%d' %
-                    (0, round(download_metric.time), 0, download_metric.quality,
-                    download_metric.downloaded, download_metric.size,
-                    download_metric.time, download_metric.time_to_first_bit,
-                    download_metric.time - download_metric.time_to_first_bit,
-                    self.util.get_buffer_level()))
             self.firstSegment = False
 
             self.next_segment = 1
@@ -1448,21 +1413,15 @@ class Sabre():
 
             # do we have space for a new segment on the buffer?
             full_delay = self.util.get_buffer_level() + self.util.manifest.segment_time - self.buffer_size
-            #print(full_delay, self.util.get_buffer_level(), self.util.manifest.segment_time, self.buffer_size)
 
             if full_delay > 0:
                 self.util.deplete_buffer(full_delay)
                 self.network.delay(full_delay)
                 self.abr.report_delay(full_delay)
-                if self.util.verbose:
-                    print('full buffer delay %d bl=%d' %
-                        (full_delay, self.util.get_buffer_level()))
 
             if self.abandoned_to_quality == None:
                 (quality, delay) = self.abr.get_quality_delay(self.next_segment)
-                #print('Quality: %d | delay: %d ' % (quality, delay))
                 replace = self.replacer.check_replace(quality)
-                #print('Replace: ' , replace)
             else:
                 (quality, delay) = (self.abandoned_to_quality, 0)
                 replace = None
@@ -1483,45 +1442,11 @@ class Sabre():
             if delay > 0:
                 self.util.deplete_buffer(delay)
                 self.network.delay(delay)
-                if self.util.verbose:
-                    print('abr delay %d bl=%d' % (delay, self.util.get_buffer_level()))
 
             download_metric = self.network.download(size, current_segment, quality,
                                             self.util.get_buffer_level(), check_abandon)
 
-            if self.util.verbose:
-                print('[%d-%d]  %d: q=%d s=%d/%d t=%d=%d+%d ' %
-                    (round(self.util.total_play_time), round(self.util.total_play_time + download_metric.time),
-                    current_segment, download_metric.quality,
-                    download_metric.downloaded, download_metric.size,
-                    download_metric.time, download_metric.time_to_first_bit,
-                    download_metric.time - download_metric.time_to_first_bit),
-                    end='')
-                if replace == None:
-                    if download_metric.abandon_to_quality == None:
-                        print('bl=%d' % self.util.get_buffer_level(), end='')
-                    else:
-                        print(' ABANDONED to %d - %d/%d bits in %d=%d+%d ttfb+ttdl  bl=%d' %
-                            (download_metric.abandon_to_quality,
-                            download_metric.downloaded, download_metric.size,
-                            download_metric.time, download_metric.time_to_first_bit,
-                            download_metric.time - download_metric.time_to_first_bit,
-                            self.util.get_buffer_level()),
-                            end='')
-                else:
-                    if download_metric.abandon_to_quality == None:
-                        print(' REPLACEMENT  bl=%d' %
-                            self.util.get_buffer_level(), end='')
-                    else:
-                        print(' REPLACMENT ABANDONED after %d=%d+%d ttfb+ttdl  bl=%d' %
-                            (download_metric.time, download_metric.time_to_first_bit,
-                            download_metric.time - download_metric.time_to_first_bit,
-                            self.util.get_buffer_level()),
-                            end='')
-
             self.util.deplete_buffer(download_metric.time)
-            if self.util.verbose:
-                print('->%d' % self.util.get_buffer_level(), end='')
 
             # Update buffer with new download
             if replace == None:
@@ -1540,9 +1465,6 @@ class Sabre():
                 else:
                     pass
                 # else: do nothing because segment abandonment does not suggest new download
-
-            if self.util.verbose:
-                print('->%d' % self.util.get_buffer_level())
 
             self.abr.report_download(download_metric, replace != None)
 
@@ -1571,13 +1493,6 @@ class Sabre():
             # loop while next_segment < len(manifest.segments)
 
         to_time_average = 1 / (self.util.total_play_time / self.util.manifest.segment_time)
-        # print('time average played bitrate: %f' %
-        #         (self.util.played_bitrate * to_time_average))
-        
-        # print('time_average_bitrate_change:', self.util.total_bitrate_change * to_time_average)
-
-        # print('time average rebuffer events: %f' %
-        #         (self.util.rebuffer_event_count * to_time_average))
 
         result = {}
         result['buffer_size'] = self.buffer_size
@@ -1589,7 +1504,7 @@ class Sabre():
     
     def printResults(self):
         to_time_average = 1 / (self.util.total_play_time / self.util.manifest.segment_time)
-        if self.util.verbose:
+        if self.util.verbose and 1 == 2:
             # multiply by to_time_average to get per/chunk average
             count = len(self.util.manifest.segments)
             #time = count * self.util.manifest.segment_time + self.util.rebuffer_time + startup_time
@@ -1671,18 +1586,19 @@ class Sabre():
         '''
         For test cases.
         '''
-        result = {}
+        foo = False
+        while foo == False:
+            foo = sabre.downloadSegment()
+        print(foo)
 
-        i = 0
-
-        while True:
-            if isinstance(result, dict) and len(result) > 10: break            
-            result = self.downloadSegment()
-            i += 1
-        return result
+        # Zweites Segment
+        foo = False
+        while foo == False:
+            foo = sabre.downloadSegment()
+        print(foo)
 
 
 if __name__ == '__main__':
-    sabre = Sabre(verbose=True, abr='throughput', moving_average='ewma', replace='right', abr_osc=False)
+    sabre = Sabre(verbose=False, abr='throughput', moving_average='ewma', replace='right', abr_osc=False)
     sabre.testing()
 
