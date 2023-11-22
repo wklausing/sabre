@@ -19,13 +19,13 @@ class NetworkModel:
     userCount = 0
 
 
-    permanent = True # If false does also mean that the network trace is empty
+    permanent = False # If false does also mean that the network trace is empty
     network_total_timeTEMP = 0 #self.util.network_total_time
     time_to_nextTEMP = 0 #self.time_to_next
     indexTEMP = 0 # self.index
 
 
-    def __init__(self, util, duration_ms, bandwidth_kbps, latency_ms):
+    def __init__(self, util, duration_ms=1000, bandwidth_kbps=100, latency_ms=100):
         self.util = util
 
         self.util.sustainable_quality = None
@@ -34,10 +34,10 @@ class NetworkModel:
         self.index = -1
         self.indexTEMP = -1
         self.time_to_next = 0
-        self._add_network_condition(duration_ms, bandwidth_kbps, latency_ms)
-        if self._next_network_period() == False:
-            print('Missing initial network condition')
-            return False
+        # self._add_network_condition(duration_ms, bandwidth_kbps, latency_ms)
+        # if self._next_network_period() == False:
+        #     print('Missing initial network condition')
+        #     return False
         self.time_to_next = self.time_to_nextTEMP
         self.index = self.indexTEMP
 
@@ -106,11 +106,12 @@ class NetworkModel:
         '''
         Return download time
         '''
+        print('cut')
         total_download_time = 0
-        while size > 0:
+        while size > 0: # 886360
             current_bandwidth = self.traces[self.indexTEMP].bandwidth
             if size <= self.time_to_nextTEMP * current_bandwidth:
-                time = size / current_bandwidth
+                time = size / current_bandwidth #1481.8 = 296360 / 200 | 1531.8 = 306360.0 / 200
                 total_download_time += time
                 self.network_total_timeTEMP += time
                 self.time_to_nextTEMP -= time
@@ -119,6 +120,7 @@ class NetworkModel:
                 total_download_time += self.time_to_nextTEMP
                 self.network_total_timeTEMP += self.time_to_nextTEMP
                 size -= self.time_to_nextTEMP * current_bandwidth
+                print('size', size, 'time_to_nextTEMP', self.time_to_nextTEMP, 'current_bandwidth', current_bandwidth)
                 self._next_network_period()
                 if self.permanent == False: break
         return total_download_time
@@ -238,8 +240,18 @@ class NetworkModel:
                                          abandon_to_quality=None)
         elif not check_abandon or (NetworkModel.min_progress_time <= 0 and
                                  NetworkModel.min_progress_size <= 0):
-            latency = self._do_latency_delay(1) # 75
+            
+            latency = self._do_latency_delay(1) # 100
+            if self.permanent == False: return False
+
             time = latency + self._do_download(size)
+            if self.permanent == False: return False
+
+            if not time == 5381.8: 
+                print('time is not 5381.8, but --> ', time)
+            else:
+                print('time is 5381.8')
+                quit()
             if self.permanent == False: return False
             return self.DownloadProgress(index=idx, quality=quality,
                                          size=size, downloaded=size,
@@ -408,7 +420,7 @@ class Sabre():
         self.abr_list[abr].use_abr_u = not abr_osc
         self.abr = self.abr_list[abr](config, self.util)
 
-        self.network = NetworkModel(self.util, duration_ms, bandwidth_kbps, latency_ms)
+        self.network = NetworkModel(self.util)
 
         self.replacer = Replace(1, self.util)
 
@@ -428,15 +440,6 @@ class Sabre():
         if self.firstSegment: 
             quality = self.abr.get_first_quality()
             size = segment['segment_sizes_bits'][quality]
-            
-            # self.network._add_network_condition(100,100,100)
-            # download_metric = self.network.downloadNet(size, 0, quality, 0, None)
-
-            # while not download_metric:
-            #     self.network._add_network_condition(100,100,100)
-            #     download_metric = self.network.downloadNet(size, 0, quality, 0, None)
-
-            # print(download_metric)
 
             download_metric = self.network.downloadNet(size, 0, quality, 0, None)
             if download_metric == False: return False
@@ -548,6 +551,8 @@ class Sabre():
             time = download_time
             # loop while next_segment < len(manifest.segments)
         
+        print('self.util.total_play_time', self.util.total_play_time)
+        self.util.total_play_time += 50
         to_time_average = 1 / (self.util.total_play_time / segment['segment_duration_ms'])
 
         result = {}
@@ -568,9 +573,31 @@ if __name__ == '__main__':
     i = 0
     while foo == False:
         foo = sabre.downloadSegment(segment)
-        if i % 2 == 0:
-            sabre.network._add_network_condition(100,100,100)
-        else:
-            sabre.network._add_network_condition(200,200,200)
+        if i % 2 == 0 and not foo:
+            sabre.network._add_network_condition(1000,100,100)
+        elif not foo:
+            sabre.network._add_network_condition(2000,200,200)
+        i += 1
+    print(foo)
+    seg = {'buffer_size': 25000, 'time_average_played_bitrate': 0.5574343156564718, 'time_average_bitrate_change': 0.0, 'time_average_rebuffer_events': 0.0}
+    if foo == seg:
+        print('Seg1 and Seg2 are same')
+    else:
+        print('Seg1 and Seg2 are not same')
+        print(seg)
+        quit()
+
+    seg2 = {'buffer_size': 25000, 'time_average_played_bitrate': 0.2783641466979053, 'time_average_bitrate_change': 0.0, 'time_average_rebuffer_events': 0.2783641466979053}
+
+
+
+    foo = False
+    i = 0
+    while foo == False:
+        foo = sabre.downloadSegment(segment)
+        if i % 2 == 0 and not foo:
+            sabre.network._add_network_condition(1000,100,100)
+        elif not foo:
+            sabre.network._add_network_condition(2000,200,200)
         i += 1
     print(foo)

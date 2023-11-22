@@ -282,15 +282,16 @@ class NetworkModel:
             current_bandwidth = self.trace[self.index].bandwidth
             if size <= self.time_to_next * current_bandwidth:
                 # current_bandwidth > 0
-                time = size / current_bandwidth
+                time = size / current_bandwidth #1481.8 = 296360 / 200
                 total_download_time += time
                 self.util.network_total_time += time
                 self.time_to_next -= time
                 size = 0
             else:
-                total_download_time += self.time_to_next
+                total_download_time += self.time_to_next # 900
                 self.util.network_total_time += self.time_to_next
                 size -= self.time_to_next * current_bandwidth
+                print('size', size, 'time_to_next', self.time_to_next, 'current_bandwidth', current_bandwidth)
                 self._next_network_period()
         return total_download_time
 
@@ -386,7 +387,7 @@ class NetworkModel:
                                          abandon_to_quality=None)
 
         if not check_abandon:
-            latency = self._do_latency_delay(1)
+            latency = self._do_latency_delay(1) # 100
             time = latency + self._do_download(size)
             return self.DownloadProgress(index=idx, quality=quality,
                                          size=size, downloaded=size,
@@ -1492,6 +1493,7 @@ class Sabre():
             time = download_time
             # loop while next_segment < len(manifest.segments)
 
+        print('self.util.total_play_time', self.util.total_play_time)
         to_time_average = 1 / (self.util.total_play_time / self.util.manifest.segment_time)
 
         result = {}

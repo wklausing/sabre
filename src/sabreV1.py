@@ -195,6 +195,7 @@ class NetworkModel:
         self.next_network_period()
 
     def next_network_period(self):
+        print('next_network_period')
         global manifest
         global sustainable_quality
         global network_total_time
