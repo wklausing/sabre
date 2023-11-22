@@ -388,7 +388,7 @@ class NetworkModel:
 
         if not check_abandon:
             latency = self._do_latency_delay(1) # 100
-            time = latency + self._do_download(size)
+            time = latency + self._do_download(size) # 5481.8
             return self.DownloadProgress(index=idx, quality=quality,
                                          size=size, downloaded=size,
                                          time=time, time_to_first_bit=latency,
@@ -400,9 +400,9 @@ class NetworkModel:
         min_size_to_progress = NetworkModel.min_progress_size
 
         if NetworkModel.min_progress_size > 0:
-            latency = self._do_latency_delay(1)
+            latency = self._do_latency_delay(1)#200
             total_download_time += latency
-            min_time_to_progress -= total_download_time
+            min_time_to_progress -= total_download_time # -150
             delay_units = 0
         else:
             latency = None
@@ -410,7 +410,6 @@ class NetworkModel:
 
         abandon_quality = None
         while total_download_size < size and abandon_quality == None:
-
             if delay_units > 0:
                 # NetworkModel.min_progress_size <= 0
                 (units, time) = self._do_minimal_latency_delay(
@@ -422,7 +421,7 @@ class NetworkModel:
                     latency = total_download_time
 
             if delay_units <= 0:
-                # don't use else to allow fall through
+                # don't use else to allow fall through # bits= 12000, time=60
                 (bits, time) = self._do_minimal_download(size - total_download_size,
                                                         min_size_to_progress, min_time_to_progress)
                 total_download_time += time
@@ -1396,7 +1395,7 @@ class Sabre():
             t = download_metric.size / download_time # t represents throughput per ms
             l = download_metric.time_to_first_bit
             self.throughput_history.push(download_time, t, l)
-            self.util.total_play_time += download_metric.time
+            self.util.total_play_time += download_metric.time # 5481.8
 
             self.firstSegment = False
 
@@ -1444,10 +1443,11 @@ class Sabre():
                 self.util.deplete_buffer(delay)
                 self.network.delay(delay)
 
+            print('size', size, 'current_segment', current_segment, 'quality', quality, 'buffer_level', self.util.get_buffer_level())
             download_metric = self.network.download(size, current_segment, quality,
                                             self.util.get_buffer_level(), check_abandon)
 
-            self.util.deplete_buffer(download_metric.time)
+            self.util.deplete_buffer(download_metric.time) #5631.8
 
             # Update buffer with new download
             if replace == None:
@@ -1494,11 +1494,12 @@ class Sabre():
             # loop while next_segment < len(manifest.segments)
 
         print('self.util.total_play_time', self.util.total_play_time)
+        # Is 11113.599999999999
         to_time_average = 1 / (self.util.total_play_time / self.util.manifest.segment_time)
 
         result = {}
         result['buffer_size'] = self.buffer_size
-        result['time_average_played_bitrate'] = 1 / (self.util.total_play_time / self.util.manifest.segment_time)
+        result['time_average_played_bitrate'] = 1 / (self.util.total_play_time / self.util.manifest.segment_time)# 11113.599999999999 / 3000
         result['time_average_bitrate_change'] = self.util.total_bitrate_change * to_time_average
         result['time_average_rebuffer_events'] = self.util.rebuffer_event_count * to_time_average
         

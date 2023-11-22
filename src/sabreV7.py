@@ -1,4 +1,4 @@
-from sabreV6 import BolaEnh, Ewma, Util, Replace, SessionInfo
+from sabreV6 import BolaEnh, Ewma, Util, Replace, SessionInfo, SlidingWindow, Bola, ThroughputRule, Dynamic, DynamicDash, Bba
 from collections import namedtuple
 import math
 
@@ -97,7 +97,6 @@ class NetworkModel:
         '''
         Return download time
         '''
-        print('cut')
         total_download_time = 0
         while size >= 0:
             current_bandwidth = self.traces[self.indexTEMP].bandwidth
@@ -111,7 +110,7 @@ class NetworkModel:
                 total_download_time += self.time_to_nextTEMP
                 self.network_total_timeTEMP += self.time_to_nextTEMP
                 size -= self.time_to_nextTEMP * current_bandwidth
-                print('size', size, 'time_to_nextTEMP', self.time_to_nextTEMP, 'current_bandwidth', current_bandwidth)
+                #print('size', size, 'time_to_nextTEMP', self.time_to_nextTEMP, 'current_bandwidth', current_bandwidth)
                 self._next_network_period()
                 if self.permanent == False: break
         return total_download_time
@@ -309,20 +308,28 @@ class NetworkModel:
 
 class Sabre():
 
-    abr_list = {}
-    abr_list['bolae'] = BolaEnh
-
-    ManifestInfo = namedtuple('ManifestInfo', 'segment_time bitrates utilities segments')
-    NetworkPeriod = namedtuple('NetworkPeriod', 'time bandwidth latency permanent')
-
     average_default = 'ewma'
     average_list = {}
     average_list['ewma'] = Ewma
+    average_list['sliding'] = SlidingWindow
+
+    abr_default = 'bolae'
+    abr_list = {}
+    abr_list['bola'] = Bola
+    abr_list['bolae'] = BolaEnh
+    abr_list['throughput'] = ThroughputRule
+    abr_list['dynamic'] = Dynamic
+    abr_list['dynamicdash'] = DynamicDash
+    abr_list['bba'] = Bba
+
+    ManifestInfo = namedtuple('ManifestInfo', 'segment_time bitrates utilities segments')
+    NetworkPeriod = namedtuple('NetworkPeriod', 'time bandwidth latency permanent')
 
     util = Util()
     throughput_history = None
     abr = None
     firstSegment = True
+    next_segment = 0
 
     def __init__(
         self,
@@ -343,24 +350,17 @@ class Sabre():
         replace='none',
         seek=None,
         verbose=True,
-        window_size=[3],
-
-        duration_ms = 0, 
-        bandwidth_kbps = 0, 
-        latency_ms = 0
+        window_size=[3]
     ):  
         self.no_abandon = no_abandon
         self.seek = seek
 
         self.util.verbose = verbose
-
         self.util.buffer_contents = []
         self.util.buffer_fcc = 0
         self.util.pending_quality_up = []
-
         self.util.rebuffer_event_count = 0
         self.util.rebuffer_time = 0
-
         self.util.played_utility = 0
         self.util.played_bitrate = 0
         self.util.total_play_time = 0
@@ -382,7 +382,6 @@ class Sabre():
         self.util.max_buffer_size = max_buffer * 1000
 
         self.util.manifest = self.util.load_json(movie)
-
         bitrates = self.util.manifest['bitrates_kbps']
         utility_offset = 0 - math.log(bitrates[0])  # so utilities[0] = 0
         utilities = [math.log(b) + utility_offset for b in bitrates]
@@ -412,19 +411,18 @@ class Sabre():
         config = {'window_size': window_size, 'half_life': half_life}
         self.throughput_history = Ewma(config, self.util)
 
-    def downloadSegment(self, segment=None, trace=None):
-        ## Bespiel Segment ##
-        if segment == None:
-            print('Missing segment')
-            return False
+    def downloadSegment(self, trace=None, lastSegment=False):
 
+        # Final playout of buffer at the end.
+        if self.next_segment == len(self.util.manifest.segments):
+            self.util.playout_buffer()
+            print('DONE')
+            return
+
+        # Download first segment
         if self.firstSegment:
-            self.next_segment = 0
-
-        # download first segment
-        if self.firstSegment: 
             quality = self.abr.get_first_quality()
-            size = segment['segment_sizes_bits'][quality]
+            size = self.util.manifest.segments[0][quality]
 
             download_metric = self.network.downloadNet(size, 0, quality, 0, None)
             if download_metric == False: return False
@@ -438,14 +436,8 @@ class Sabre():
             self.firstSegment = False
             self.next_segment = 1
             self.abandoned_to_quality = None
-        else:   
-            # download rest of segments
-
-            # Here is final playout of buffer at the end.
-            if self.next_segment == len(self.util.manifest.segments): 
-                self.util.playout_buffer()
-                result = self.printResults()
-                return result
+        else:
+            # Download rest of segments
 
             # do we have space for a new segment on the buffer?
             full_delay = self.util.get_buffer_level() + self.util.manifest.segment_time - self.buffer_size
@@ -483,11 +475,11 @@ class Sabre():
                 self.util.deplete_buffer(delay)
                 if self.util.verbose:
                     print('abr delay %d bl=%d' % (delay, self.util.get_buffer_level()))
-
+            
             download_metric = self.network.downloadNet(size, current_segment, quality,
                                             self.util.get_buffer_level(), check_abandon)
 
-            self.util.deplete_buffer(download_metric.time)
+            self.util.deplete_buffer(download_metric.time) #5481.8
 
             # Update buffer with new download
             if replace == None:
@@ -533,60 +525,55 @@ class Sabre():
             if download_metric.abandon_to_quality == None:
                 self.throughput_history.push(download_time, t, l)
 
-            time = download_time
             # loop while next_segment < len(manifest.segments)
         
-        print('self.util.total_play_time', self.util.total_play_time)
-        to_time_average = 1 / (self.util.total_play_time / segment['segment_duration_ms'])
+        # Is 10963.599999999999 but should be 11113.599999999999. Missing 150
+        to_time_average = 1 / (self.util.total_play_time / self.util.manifest.segment_time)
 
         result = {}
         result['buffer_size'] = self.buffer_size
-        result['time_average_played_bitrate'] = 1 / (self.util.total_play_time / self.util.manifest.segment_time)#5531.8 / 3000
+        result['time_average_played_bitrate'] = 1 / (self.util.total_play_time / self.util.manifest.segment_time)#10963.599999999999 / 3000
         result['time_average_bitrate_change'] = self.util.total_bitrate_change * to_time_average
         result['time_average_rebuffer_events'] = self.util.rebuffer_event_count * to_time_average
         return result
 
 
 if __name__ == '__main__':
-    sabre = Sabre()
-    
-    segment = {'segment_duration_ms': 3000, 
-                'bitrates_kbps': [ 230, 331, 477, 688, 991, 1427, 2056, 2962, 5027, 6000 ], 
-                'segment_sizes_bits': [ 886360, 1180512, 1757888, 2321704, 3515816, 5140704, 7395048, 10097056, 17115584, 20657480 ]}
+    sabre = Sabre(verbose=False, abr='throughput', moving_average='ewma', replace='right', abr_osc=False)
+
     foo = False
     i = 0
     while foo == False:
-        foo = sabre.downloadSegment(segment)
+        foo = sabre.downloadSegment()
         if i % 2 == 0 and not foo:
             sabre.network._add_network_condition(1000,100,100)
         elif not foo:
             sabre.network._add_network_condition(2000,200,200)
         i += 1
-    print(foo)
     seg = {'buffer_size': 25000, 'time_average_played_bitrate': 0.5472654967346492, 'time_average_bitrate_change': 0.0, 'time_average_rebuffer_events': 0.0}
     if foo == seg:
-        print('Seg1 and Seg2 are same')
+        print('Seg1 is correct')
     else:
-        print('Seg1 and Seg2 are not same')
-        print(seg)
+        print('Seg1 wrong')
         quit()
-
-    seg2 = {'buffer_size': 25000, 'time_average_played_bitrate': 0.2783641466979053, 'time_average_bitrate_change': 0.0, 'time_average_rebuffer_events': 0.2783641466979053}
-
-
 
     foo = False
     i = 0
     while foo == False:
-        foo = sabre.downloadSegment(segment)
+        foo = sabre.downloadSegment()
         if i % 2 == 0 and not foo:
             sabre.network._add_network_condition(1000,100,100)
         elif not foo:
             sabre.network._add_network_condition(2000,200,200)
         i += 1
     print(foo)
+    seg2 = {'buffer_size': 25000, 'time_average_played_bitrate': 0.2699395335444861, 'time_average_bitrate_change': 0.0, 'time_average_rebuffer_events': 0.2699395335444861}
+    if foo == seg2:
+        print('Seg2 is correct')
+    else:
+        print('Seg2 wrong')
+        quit()
 
 
-    #time is not 5381.8, but -->  5481.8
-
-    #time is not 5381.8, but -->  5531.8
+        # {'buffer_size': 25000, 'time_average_played_bitrate': 0.5472654967346492, 'time_average_bitrate_change': 0.0, 'time_average_rebuffer_events': 0.0}
+        # {'buffer_size': 25000, 'time_average_played_bitrate': 0.2699395335444861, 'time_average_bitrate_change': 0.0, 'time_average_rebuffer_events': 0.2699395335444861}
