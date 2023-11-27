@@ -78,7 +78,7 @@ class NetworkModel:
         '''
         total_delay = 0
         while delay_units > 0:
-            current_latency = self.traces[self.indexTEMP].latency
+            current_latency = self.traces[self.indexTEMP].latency # 200
             time = delay_units * current_latency
             if time <= self.time_to_nextTEMP:
                 total_delay += time
@@ -223,6 +223,9 @@ class NetworkModel:
         self.time_to_nextTEMP = self.time_to_next
         self.indexTEMP = self.index
 
+        print('self.util.network_total_time', self.util.network_total_time, 'self.time_to_next', self.time_to_next, 'self.index', self.index)
+        #Ist: self.util.network_total_time 0 self.time_to_next 0 self.index -1
+
         if size <= 0:# If size is not positive, than return 
             downloadProgress = self.DownloadProgress(index=idx, quality=quality,
                                          size=0, downloaded=0,
@@ -248,9 +251,9 @@ class NetworkModel:
             min_size_to_progress = NetworkModel.min_progress_size
 
             if NetworkModel.min_progress_size > 0:
-                latency = self._do_latency_delay(1)
-                total_download_time += latency
-                min_time_to_progress -= total_download_time
+                latency = self._do_latency_delay(1) # Sollte 200 sein, ist aber 100
+                total_download_time += latency # 200
+                min_time_to_progress -= total_download_time # -150
                 delay_units = 0
             else:
                 latency = None
@@ -476,10 +479,12 @@ class Sabre():
                 if self.util.verbose:
                     print('abr delay %d bl=%d' % (delay, self.util.get_buffer_level()))
             
+            print('size', size, 'current_segment', current_segment, 'quality', quality, 'buffer_level', self.util.get_buffer_level())
+            # Here ist alles richtig
             download_metric = self.network.downloadNet(size, current_segment, quality,
                                             self.util.get_buffer_level(), check_abandon)
 
-            self.util.deplete_buffer(download_metric.time) #5481.8
+            self.util.deplete_buffer(download_metric.time) #Is 5481.8, should be 5631.8
 
             # Update buffer with new download
             if replace == None:

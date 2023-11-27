@@ -81,7 +81,7 @@ class Util:
         '''
         return self.manifest.segment_time * len(self.buffer_contents) - self.buffer_fcc
 
-    def deplete_buffer(self, time):
+    def deplete_buffer(self, time):# Is 5481.8, should be 5631.8. Missing exactly 150
 
         if len(self.buffer_contents) == 0:
             self.rebuffer_time += time
@@ -127,16 +127,16 @@ class Util:
 
             if time >= self.manifest.segment_time:
                 self.buffer_contents.pop(0)
-                self.total_play_time += self.manifest.segment_time
+                self.total_play_time += self.manifest.segment_time # Should be 8481.8. Is correct
                 time -= self.manifest.segment_time
             else:
                 self.buffer_fcc = time
                 self.total_play_time += time
                 time = 0
 
-        if time > 0:
+        if time > 0: # Is 2481.8, should be 2631.8. Missing exactly 150
             self.rebuffer_time += time
-            self.total_play_time += time
+            self.total_play_time += time # Should be 11113.599999999999
             self.rebuffer_event_count += 1
 
         self.process_quality_up(self.total_play_time)
@@ -380,6 +380,10 @@ class NetworkModel:
         '''
         Returns tuple of DownloadProgress.
         '''
+        print('self.util.network_total_time', self.util.network_total_time, 'self.time_to_next', self.time_to_next, 'self.index', self.index)
+        # self.util.network_total_time 0 self.time_to_next 1000 self.index 0
+        # self.util.network_total_time 5481.8 self.time_to_next 518.2 self.index 1
+
         if size <= 0:# If size is not positive, than return 
             return self.DownloadProgress(index=idx, quality=quality,
                                          size=0, downloaded=0,
@@ -400,8 +404,8 @@ class NetworkModel:
         min_size_to_progress = NetworkModel.min_progress_size
 
         if NetworkModel.min_progress_size > 0:
-            latency = self._do_latency_delay(1)#200
-            total_download_time += latency
+            latency = self._do_latency_delay(1) # 200
+            total_download_time += latency # 200
             min_time_to_progress -= total_download_time # -150
             delay_units = 0
         else:
@@ -1444,6 +1448,7 @@ class Sabre():
                 self.network.delay(delay)
 
             print('size', size, 'current_segment', current_segment, 'quality', quality, 'buffer_level', self.util.get_buffer_level())
+            # size 886360 current_segment 1 quality 0 buffer_level 3000
             download_metric = self.network.download(size, current_segment, quality,
                                             self.util.get_buffer_level(), check_abandon)
 
