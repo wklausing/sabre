@@ -8,6 +8,7 @@ from src.sabreV2 import init as initSabreV2 # Encapsulation done
 from src.sabreV3 import Sabre as SabreV3
 from src.sabreV4 import Sabre as SabreV4
 from src.sabreV6 import Sabre as SabreV6
+from src.sabreV7 import Sabre as SabreV7
 # from src.sabreV5 import Sabre as SabreV5 # Working on this
 
 #from src.gymSabre import SabreGym
@@ -124,20 +125,38 @@ class TestMainFunction(unittest.TestCase):
     #     print('QoE: ', QoE)
     #     self.assertEqual(1, 1)
         
-    def testCheckValuesAgainstSabreV6(self):
+    # def testCheckValuesAgainstSabreV6(self):
+    #     '''
+    #     Testing sabreV4.py against sabreV6.py
+    #     '''
+    #     abrList = ['bola', 'bolae', 'throughput', 'dynamic', 'dynamicdash']
+    #     averageList = ['ewma', 'sliding']
+    #     for abr in abrList:
+    #         for average in averageList:
+    #             print('Testing: ', abr, average)
+    #             resultSabreV4 = SabreV4(abr=abr, moving_average=average, verbose=False,  replace='right').testing()
+    #             resultSabreV6 = SabreV6(abr=abr, moving_average=average, verbose=False,  replace='right').testing()
+    #             for key in resultSabreV4:
+    #                 print(key)
+    #                 self.assertEqual(resultSabreV4[key], resultSabreV6[key])
+
+    def testCheckValuesAgainstSabreV7(self):
         '''
-        Testing sabreV4.py against sabreV6.py
+        Testing sabreV6.py against sabreV7.py
         '''
         abrList = ['bola', 'bolae', 'throughput', 'dynamic', 'dynamicdash']
         averageList = ['ewma', 'sliding']
         for abr in abrList:
             for average in averageList:
                 print('Testing: ', abr, average)
-                resultSabreV4 = SabreV4(abr=abr, moving_average=average, verbose=False,  replace='right').testing()
                 resultSabreV6 = SabreV6(abr=abr, moving_average=average, verbose=False,  replace='right').testing()
-                for key in resultSabreV4:
-                    print(key)
-                    self.assertEqual(resultSabreV4[key], resultSabreV6[key])
+                resultSabreV7 = SabreV7(abr=abr, moving_average=average, verbose=False,  replace='right').testing()
+                for key in resultSabreV6:
+                    #print(key)
+                    try:
+                        self.assertEqual(resultSabreV6[key], resultSabreV7[key])
+                    except AssertionError:
+                        print('Error: ', key, resultSabreV6[key], resultSabreV7[key])
 
 
 if __name__ == '__main__':

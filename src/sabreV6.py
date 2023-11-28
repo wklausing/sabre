@@ -291,7 +291,6 @@ class NetworkModel:
                 total_download_time += self.time_to_next # 900
                 self.util.network_total_time += self.time_to_next
                 size -= self.time_to_next * current_bandwidth
-                print('size', size, 'time_to_next', self.time_to_next, 'current_bandwidth', current_bandwidth)
                 self._next_network_period()
         return total_download_time
 
@@ -380,10 +379,6 @@ class NetworkModel:
         '''
         Returns tuple of DownloadProgress.
         '''
-        print('self.util.network_total_time', self.util.network_total_time, 'self.time_to_next', self.time_to_next, 'self.index', self.index)
-        # self.util.network_total_time 0 self.time_to_next 1000 self.index 0
-        # self.util.network_total_time 5481.8 self.time_to_next 518.2 self.index 1
-
         if size <= 0:# If size is not positive, than return 
             return self.DownloadProgress(index=idx, quality=quality,
                                          size=0, downloaded=0,
@@ -1447,8 +1442,6 @@ class Sabre():
                 self.util.deplete_buffer(delay)
                 self.network.delay(delay)
 
-            print('size', size, 'current_segment', current_segment, 'quality', quality, 'buffer_level', self.util.get_buffer_level())
-            # size 886360 current_segment 1 quality 0 buffer_level 3000
             download_metric = self.network.download(size, current_segment, quality,
                                             self.util.get_buffer_level(), check_abandon)
 
@@ -1498,8 +1491,6 @@ class Sabre():
             time = download_time
             # loop while next_segment < len(manifest.segments)
 
-        print('self.util.total_play_time', self.util.total_play_time)
-        # Is 11113.599999999999
         to_time_average = 1 / (self.util.total_play_time / self.util.manifest.segment_time)
 
         result = {}
@@ -1594,19 +1585,18 @@ class Sabre():
         '''
         For test cases.
         '''
-        foo = False
-        while foo == False:
-            foo = sabre.downloadSegment()
-        print(foo)
-
-        # Zweites Segment
-        foo = False
-        while foo == False:
-            foo = sabre.downloadSegment()
-        print(foo)
+        result = {}
+        while len(result) != 19:
+            result = self.downloadSegment()
+        return result
 
 
 if __name__ == '__main__':
     sabre = Sabre(verbose=False, abr='throughput', moving_average='ewma', replace='right', abr_osc=False)
-    sabre.testing()
+    #sabre.testing()
+    
+    result = {}
+    while len(result) != 19:
+        result = sabre.downloadSegment()
+    print(result)
 

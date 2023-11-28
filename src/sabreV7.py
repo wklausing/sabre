@@ -223,11 +223,6 @@ class NetworkModel:
         self.time_to_nextTEMP = self.time_to_next
         self.indexTEMP = self.index
 
-        print('self.util.network_total_time', self.util.network_total_time, 'self.time_to_next', self.time_to_next, 'self.index', self.index)
-
-        #Ist:             self.util.network_total_time 0 self.time_to_next 0 self.index -1
-        # Sollte so sein: self.util.network_total_time 5481.8 self.time_to_next 518.2 self.index 1
-
         if size <= 0:# If size is not positive, than return 
             downloadProgress = self.DownloadProgress(index=idx, quality=quality,
                                          size=0, downloaded=0,
@@ -304,8 +299,7 @@ class NetworkModel:
                                         time=total_download_time, time_to_first_bit=latency,
                                         abandon_to_quality=abandon_quality)
             
-        if self.permanent: # 5481.8 518.2 3 <<<< Nach erstem Segment
-            #print('Segment ist durch: ',self.network_total_timeTEMP, self.time_to_nextTEMP, self.indexTEMP)
+        if self.permanent:
             self.util.network_total_time = self.network_total_timeTEMP
             self.time_to_next = self.time_to_nextTEMP
             self.index = self.indexTEMP
@@ -424,7 +418,8 @@ class Sabre():
         # Final playout of buffer at the end.
         if self.next_segment == len(self.util.manifest.segments):
             self.util.playout_buffer()
-            return True
+            return self.printResults()
+             
 
         # Download first segment
         if self.firstSegment:
@@ -432,7 +427,7 @@ class Sabre():
             size = self.util.manifest.segments[0][quality]
 
             download_metric = self.network.downloadNet(size, 0, quality, 0, None)
-            if download_metric == False: return False
+            if download_metric == False: return {'done': False}
 
             download_time = download_metric.time - download_metric.time_to_first_bit
             self.util.buffer_contents.append(download_metric.quality)
@@ -483,11 +478,9 @@ class Sabre():
                 if self.util.verbose:
                     print('abr delay %d bl=%d' % (delay, self.util.get_buffer_level()))
             
-            print('size', size, 'current_segment', current_segment, 'quality', quality, 'buffer_level', self.util.get_buffer_level())
-            # Here ist alles richtig
             download_metric = self.network.downloadNet(size, current_segment, quality,
                                             self.util.get_buffer_level(), check_abandon)
-            if download_metric == False: return False
+            if download_metric == False: return {'done': False}
 
             self.util.deplete_buffer(download_metric.time) #Is 5481.8, should be 5631.8
 
@@ -541,61 +534,109 @@ class Sabre():
         to_time_average = 1 / (self.util.total_play_time / self.util.manifest.segment_time)
 
         result = {}
+        result['done'] = False
         result['buffer_size'] = self.buffer_size
         result['time_average_played_bitrate'] = 1 / (self.util.total_play_time / self.util.manifest.segment_time)#10963.599999999999 / 3000
         result['time_average_bitrate_change'] = self.util.total_bitrate_change * to_time_average
         result['time_average_rebuffer_events'] = self.util.rebuffer_event_count * to_time_average
         return result
     
-    # def testing(self, network='example/network.json'):
-    #     network_trace = self.util.load_json(network)
-    #     networkLen = len(network_trace)
-    #     i = 0
-    #     while True:
-    #         foo = sabre.downloadSegment()
-    #         if foo:
-    #             break
-    #         else:
-    #             trace = network_trace[i]
-    #             self.network._add_network_condition(trace['duration_ms'], trace['bandwidth_kbps'] ,trace['latency_ms'])
-    #             i += 1
-    #             if i >= networkLen: i = 0
+    def printResults(self):
+        to_time_average = 1 / (self.util.total_play_time / self.util.manifest.segment_time)
+        if self.util.verbose:
+            # multiply by to_time_average to get per/chunk average
+            count = len(self.util.manifest.segments)
+            #time = count * self.util.manifest.segment_time + self.util.rebuffer_time + startup_time
+
+            print('buffer size: %d' % self.buffer_size)
+            print('total played utility: %f' % self.util.played_utility)
+            print('time average played utility: %f' %
+                (self.util.played_utility * to_time_average))
+            print('total played bitrate: %f' % self.util.played_bitrate)
+            print('time average played bitrate: %f' %
+                (self.util.played_bitrate * to_time_average))
+            print('total play time: %f' % (self.util.total_play_time / 1000))
+            print('total play time chunks: %f' %
+                (self.util.total_play_time / self.util.manifest.segment_time))
+            print('total rebuffer: %f' % (self.util.rebuffer_time / 1000))
+            print('rebuffer ratio: %f' % (self.util.rebuffer_time / self.util.total_play_time))
+            print('time average rebuffer: %f' %
+                (self.util.rebuffer_time / 1000 * to_time_average))
+            print('total rebuffer events: %f' % self.util.rebuffer_event_count)
+            print('time average rebuffer events: %f' %
+                (self.util.rebuffer_event_count * to_time_average))
+            print('total bitrate change: %f' % self.util.total_bitrate_change)
+            print('time average bitrate change: %f' %
+                (self.util.total_bitrate_change * to_time_average))
+            print('total log bitrate change: %f' % self.util.total_log_bitrate_change)
+            print('time average log bitrate change: %f' %
+                (self.util.total_log_bitrate_change * to_time_average))
+            print('time average score: %f' %
+                (to_time_average * (self.util.played_utility -
+                                    self.gamma_p * self.util.rebuffer_time / self.util.manifest.segment_time)))
+
+            if self.overestimate_count == 0:
+                print('over estimate count: 0')
+                print('over estimate: 0')
+            else:
+                print('over estimate count: %d' % self.overestimate_count)
+                print('over estimate: %f' % self.overestimate_average)
+            if self.goodestimate_count == 0:
+                print('leq estimate count: 0')
+                print('leq estimate: 0')
+            else:
+                print('leq estimate count: %d' % self.goodestimate_count)
+                print('leq estimate: %f' % self.goodestimate_average)
+            print('estimate: %f' % self.estimate_average)
+            if self.util.rampup_time == None:
+                print('rampup time: %f' %
+                    (len(self.util.manifest.segments) * self.util.manifest.segment_time / 1000))
+            else:
+                print('rampup time: %f' % (self.util.rampup_time / 1000))
+            print('total reaction time: %f' % (self.util.total_reaction_time / 1000))
+
+        results_dict = {
+            'done': True,
+            'buffer_size': self.buffer_size,
+            'total_played_utility': self.util.played_utility,
+            'time_average_played_utility': self.util.played_utility * to_time_average,
+            'total_played_bitrate': self.util.played_bitrate,
+            'time_average_played_bitrate': self.util.played_bitrate * to_time_average,
+            'total_play_time': self.util.total_play_time / 1000,
+            'total_play_time_chunks': self.util.total_play_time / self.util.manifest.segment_time,
+            'total_rebuffer': self.util.rebuffer_time / 1000,
+            'rebuffer_ratio': self.util.rebuffer_time / self.util.total_play_time,
+            'time_average_rebuffer': self.util.rebuffer_time / 1000 * to_time_average,
+            'total_rebuffer_events': self.util.rebuffer_event_count,
+            'time_average_rebuffer_events': self.util.rebuffer_event_count * to_time_average,
+            'total_bitrate_change': self.util.total_bitrate_change,
+            'time_average_bitrate_change': self.util.total_bitrate_change * to_time_average,
+            'total_log_bitrate_change': self.util.total_log_bitrate_change,
+            'time_average_log_bitrate_change': self.util.total_log_bitrate_change * to_time_average,
+            'time_average_score': to_time_average * (self.util.played_utility - self.gamma_p * self.util.rebuffer_time / self.util.manifest.segment_time),
+            'total_reaction_time': self.util.total_reaction_time / 1000,
+            'estimate': self.estimate_average,
+        }
+        if self.util.verbose:
+            print(results_dict)
+
+        return results_dict
+    
+    def testing(self, network='example/network.json'):
+        network_trace = self.util.load_json(network)
+        networkLen = len(network_trace)
+        i = 0
+        while True:
+            result = self.downloadSegment()
+            if result['done']:
+                return result
+            else:
+                trace = network_trace[i]
+                self.network._add_network_condition(trace['duration_ms'], trace['bandwidth_kbps'] ,trace['latency_ms'])
+                i += 1
+                if i >= networkLen: i = 0
             
 
-
 if __name__ == '__main__':
-    sabre = Sabre(verbose=False, abr='throughput', moving_average='ewma', replace='right', abr_osc=False)
-    #sabre.testing()
-
-    foo = False
-    i = 0
-    while foo == False:
-        foo = sabre.downloadSegment()
-        if i % 2 == 0 and not foo:
-            sabre.network._add_network_condition(1000,100,100)
-        elif not foo:
-            sabre.network._add_network_condition(2000,200,200)
-        i += 1
-    seg = {'buffer_size': 25000, 'time_average_played_bitrate': 0.5472654967346492, 'time_average_bitrate_change': 0.0, 'time_average_rebuffer_events': 0.0}
-    if foo == seg:
-        print('Seg1 is correct')
-    else:
-        print('Seg1 wrong')
-        quit()
-
-    foo = False
-    i = 0
-    while foo == False:
-        foo = sabre.downloadSegment()
-        if i % 2 == 0 and not foo:
-            sabre.network._add_network_condition(1000,100,100)
-        elif not foo:
-            sabre.network._add_network_condition(2000,200,200)
-        i += 1
-    print(foo)
-    seg2 = {'buffer_size': 25000, 'time_average_played_bitrate': 0.2699395335444861, 'time_average_bitrate_change': 0.0, 'time_average_rebuffer_events': 0.2699395335444861}
-    if foo == seg2:
-        print('Seg2 is correct')
-    else:
-        print('Seg2 wrong')
-        quit()
+    sabre = Sabre(verbose=True, abr='throughput', moving_average='ewma', replace='right', abr_osc=False)
+    sabre.testing()
